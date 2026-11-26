@@ -1195,7 +1195,7 @@ function defaults() {
   return {
     v: 3, onboarded: false,
     profile: { name: '', height: 175, startWeight: 90, goal: 80, startDate: t, weeks: 12 },
-    settings: { mode: 'fixed', trainTime: 'soir', bedtime: '23:30', restAuto: true, sound: true, haptics: true, keepAwake: true, theme: 'auto', optSupps: false, waterGoal: 10, glass: 250, remindTrain: '18:00', remindWeigh: '07:30', voice: true, voiceNames: true, voiceCheer: true, voiceMix: false },
+    settings: { mode: 'fixed', trainTime: 'soir', bedtime: '23:30', restAuto: true, sound: true, haptics: true, keepAwake: true, theme: 'auto', optSupps: false, waterGoal: 10, glass: 250, remindTrain: '18:00', remindWeigh: '07:30', voice: true, voiceNames: true, voiceCheer: true, voiceMix: false, notifs: true },
     weights: [], measures: [], days: {}, sessions: [], active: null, awards: {}, cheats: [], shop: {}, fastLog: [], rot: 0,
     prog: {}, customEx: {}, savedAt: 0
   };
@@ -1526,6 +1526,7 @@ function applyTheme() {
   document.documentElement.setAttribute('data-theme', t);
   const m = document.querySelector('meta[name=theme-color]');
   if (m) m.setAttribute('content', t === 'dark' ? '#000000' : '#F2F2F7');
+  if (window.MCNative) { try { MCNative.theme(t === 'dark'); } catch (e) { /* ignore */ } }
 }
 if (mqDark && mqDark.addEventListener) mqDark.addEventListener('change', () => { if (S.settings.theme === 'auto') { applyTheme(); refresh(); } });
 
@@ -1577,6 +1578,7 @@ document.addEventListener('touchend', unlockAudio); document.addEventListener('c
 /* ---------- écran allumé ---------- */
 let WL = null;
 async function keepAwake(on) {
+  if (window.MCNative) { try { MCNative.keepAwake(!!(on && S.settings.keepAwake)); } catch (e) { /* ignore */ } return; }
   try {
     if (on && S.settings.keepAwake && 'wakeLock' in navigator) {
       if (!WL) { WL = await navigator.wakeLock.request('screen'); WL.addEventListener('release', () => { WL = null; }); }
@@ -2610,7 +2612,9 @@ function palCheck(i, j) {
 const REST = { end: 0, total: 0, iv: null, done: 0, beeps: {}, onDone: null, label: '' };
 function startRest(sec, label, onDone, vi) {
   REST.total = sec; REST.end = Date.now() + sec * 1000; REST.done = 0; REST.beeps = {}; REST.onDone = onDone || null; REST.label = label || ''; REST.vi = vi || null;
-  if (!onDone) vxRest(sec, vi);
+  const nx = vi && vi.next;
+  REST.nb = nx ? (nx.kind === 'ex' ? 'Exercice suivant : ' + (EXI[nx.id] ? EXI[nx.id].n : '') : nx.last ? 'Dernière série, donne tout.' : 'Série ' + nx.n + (nx.reps && nx.reps !== 'max' ? ' · objectif ' + nx.reps + ' reps' : '')) : (label || 'Repos terminé');
+  if (!onDone) { vxRest(sec, vi); natRest(REST.end, 'C’est reparti !', REST.nb); }
   const isl = $('#island');
   isl.innerHTML = '<div class="is-c" data-act="islandTap"><div class="is-ring"><svg viewBox="0 0 28 28"><circle cx="14" cy="14" r="11" fill="none" stroke="rgba(255,159,10,.25)" stroke-width="3.5"/><circle data-isr cx="14" cy="14" r="11" fill="none" stroke="#FF9F0A" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="69.12" stroke-dashoffset="0"/></svg></div><span class="is-l" data-isl>' + (onDone ? 'Chrono' : 'Repos') + '</span><span class="is-t" data-ist></span></div>' +
     '<div class="is-b"><div class="top"><span class="lab" data-islab>' + esc((onDone ? 'Gainage' : 'Repos') + (label ? ' · ' + label : '')) + '</span><button class="ib" style="width:30px;height:30px;background:rgba(255,255,255,.14);color:#fff;font-size:15px" data-act="islandTap" aria-label="Réduire">' + ic('chevD') + '</button></div><div class="tm" data-isb></div><div class="pb"><i data-ispb></i></div><div class="btns"><button data-act="restAdd" data-d="-15">−15 s</button><button data-act="restAdd" data-d="15">+15 s</button><button class="go" data-act="restSkip">' + (onDone ? 'Stop' : 'Passer') + '</button></div></div>';
@@ -2640,13 +2644,14 @@ function tickRest() {
     setTimeout(() => { if (REST.done && Date.now() - REST.done > 3500) stopRest(true); }, 3800);
   }
 }
-function stopRest(keepVoice) { if (!keepVoice) vxStop('rest'); clearInterval(REST.iv); REST.iv = null; REST.end = 0; REST.done = 0; const isl = $('#island'); isl.classList.remove('show', 'big', 'done'); document.documentElement.classList.remove('island-on'); }
+function stopRest(keepVoice) { if (!keepVoice) { vxStop('rest'); natRest(0); } clearInterval(REST.iv); REST.iv = null; REST.end = 0; REST.done = 0; const isl = $('#island'); isl.classList.remove('show', 'big', 'done'); document.documentElement.classList.remove('island-on'); }
 function restAdd(d) {
   if (!REST.end) return;
   REST.end = Math.max(Date.now() + 1000, REST.end + d * 1000);
   REST.total = Math.max(1, REST.total + d);
   if (REST.done && REST.end > Date.now()) { REST.done = 0; REST.beeps = {}; $('#island').classList.remove('done'); }
   if (!REST.onDone && vxOn()) vxRest((REST.end - Date.now()) / 1000, REST.vi, true);
+  if (!REST.onDone) natRest(REST.end, 'C’est reparti !', REST.nb || REST.label);
   haptic(); tickRest();
 }
 
@@ -2740,6 +2745,7 @@ function shareSession(id) {
     cv.toBlob(blob => {
       if (!blob) return;
       const name = 'my-coach-' + sess.date + '.png';
+      if (NATIVE) { const fr = new FileReader(); fr.onload = () => natShareFile(name, 'image/png', String(fr.result).split(',')[1], 'Partager la séance'); fr.readAsDataURL(blob); return; }
       let file = null; try { file = new File([blob], name, { type: 'image/png' }); } catch (e) { file = null; }
       if (file && navigator.canShare && navigator.canShare({ files: [file] })) navigator.share({ files: [file], title: 'My Coach' }).catch(() => { });
       else { const u = URL.createObjectURL(blob), l = document.createElement('a'); l.href = u; l.download = name; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 5000); toast('Image enregistrée', 'down'); }
@@ -3050,15 +3056,24 @@ function settingsHTML() {
     '<div class="foot">' + (T.voice ? (T.voiceMix ? 'La voix se mélange à ta musique tant que l’écran est allumé.' : 'La voix est préparée comme une piste audio : elle continue écran verrouillé, écouteurs branchés. Pendant un repos ou un minuteur, une musique lancée depuis une autre appli se met en pause.') : 'Une voix d’homme grave annonce tes repos, tes séries et les phases de tes minuteurs.') + '</div>';
   h += '<div class="lhd">Nutrition</div><div class="list"><div class="row"><div class="rt"><div class="t1">Objectif d’eau</div><div class="t2">' + T.waterGoal + ' verres de ' + (T.glass / 10) + ' cl</div></div><div class="stepper"><button data-act="waterGoal" data-d="-1" aria-label="Moins">' + ic('minus') + '</button><span class="sv">' + num(T.waterGoal * T.glass / 1000, 1) + NB + 'L</span><button data-act="waterGoal" data-d="1" aria-label="Plus">' + ic('plus') + '</button></div></div>' + swRow('Compléments optionnels', 'optSupps', 'Multivitamines, D3-K2, vitamine C') + '</div>';
   h += '<div class="lhd">Apparence</div>' + seg('theme', [['auto', 'Automatique'], ['light', 'Clair'], ['dark', 'Sombre']], T.theme);
-  h += '<div class="lhd">Rappels</div><div class="list">' + fieldRow('Séance', 'time', 'settings.remindTrain', T.remindTrain) + fieldRow('Pesée', 'time', 'settings.remindWeigh', T.remindWeigh) + '<div class="row tap" data-act="ics"><span class="tile" style="--c:#FF453A">' + ic('bell') + '</span><div class="rt"><div class="t1" style="color:var(--blue)">Ajouter à mon calendrier</div></div></div></div><div class="foot">Les rappels sont créés dans le calendrier de ton téléphone : ils sonnent même quand l’app est fermée.</div>';
-  if (/Android/.test(navigator.userAgent) || HEALTH) {
+  if (NATIVE) h += '<div class="lhd">Rappels</div><div class="list">' + swRow('Notifications de rappel', 'notifs', 'Séance et pesée, à l’heure choisie') + fieldRow('Séance', 'time', 'settings.remindTrain', T.remindTrain) + fieldRow('Pesée', 'time', 'settings.remindWeigh', T.remindWeigh) + '</div><div class="foot">À la fin de chaque repos, une notification « C’est reparti » s’affiche aussi quand le téléphone est verrouillé.</div>';
+  else h += '<div class="lhd">Rappels</div><div class="list">' + fieldRow('Séance', 'time', 'settings.remindTrain', T.remindTrain) + fieldRow('Pesée', 'time', 'settings.remindWeigh', T.remindWeigh) + '<div class="row tap" data-act="ics"><span class="tile" style="--c:#FF453A">' + ic('bell') + '</span><div class="rt"><div class="t1" style="color:var(--blue)">Ajouter à mon calendrier</div></div></div></div><div class="foot">Les rappels sont créés dans le calendrier de ton téléphone : ils sonnent même quand l’app est fermée.</div>';
+  if (NATIVE) {
+    const hs = natHealthStatus() || {};
+    h += '<div class="lhd">Samsung Health</div><div class="list ic">' +
+      (hs.data ? '<div class="row"><span class="tile" style="--c:#30D158">' + ic('check') + '</span><div class="rt"><div class="t1">Accès autorisé</div><div class="t2">Sommeil, pas et poids' + (hs.background ? ', même en arrière-plan' : '') + '</div></div></div>'
+        : row('shield', '#FF375F', hs.update ? 'Mettre à jour Health Connect' : 'Autoriser Samsung Health', hs.available === false && !hs.update ? 'Health Connect indisponible sur ce téléphone' : 'Sommeil, pas et poids', 'healthAuth')) +
+      (HEALTH ? '<div class="row"><span class="tile" style="--c:#5E5CE6">' + ic('moon') + '</span><div class="rt"><div class="t1">Dernière lecture</div><div class="t2">' + cap(agoTxt(HEALTH.at)) + ' · ' + santeSum() + '</div></div></div>' : '') +
+      (hs.data ? row('repeat', '#0A84FF', 'Actualiser maintenant', 'Relit Samsung Health', 'santeRefresh') : '') + '</div>' +
+      '<div class="foot">Dans Samsung Health : Paramètres → Health Connect, autorise le sommeil, les pas et le poids. My Coach les relit à chaque ouverture' + (CLOUD.token ? ' et les sauvegarde sur ton GitHub toutes les 2 heures.' : '.') + '</div>';
+  } else if (/Android/.test(navigator.userAgent) || HEALTH) {
     h += '<div class="lhd">Samsung Health</div><div class="list ic">' +
       '<div class="row"><span class="tile" style="--c:' + (HEALTH ? '#30D158' : '#8E8E93') + '">' + ic(HEALTH ? 'check' : 'moon') + '</span><div class="rt"><div class="t1">' + (HEALTH ? 'Données reçues' : 'Pas encore relié') + '</div><div class="t2">' + (HEALTH ? cap(agoTxt(HEALTH.at)) + ' · ' + santeSum() : 'Sommeil, pas et pesées, automatiquement') + '</div></div></div>' +
-      '<a class="row tap" href="' + SANTE_APK + '"><span class="tile" style="--c:#FF375F">' + ic('down') + '</span><div class="rt"><div class="t1">Installer l’appli My Coach Santé</div><div class="t2">Fichier APK, à installer une seule fois</div></div>' + ic('chev', 'chev') + '</a>' +
-      (CLOUD.token ? '<a class="row tap" href="' + esc(santeLink()) + '"><span class="tile" style="--c:#5E5CE6">' + ic('link') + '</span><div class="rt"><div class="t1">Relier l’appli Santé</div><div class="t2">Lui transmet ta sauvegarde cloud en un geste</div></div>' + ic('chev', 'chev') + '</a>'
-        : '<div class="row"><span class="tile" style="--c:#8E8E93">' + ic('link') + '</span><div class="rt"><div class="t1" style="color:var(--t3)">Relier l’appli Santé</div><div class="t2">Active d’abord la sauvegarde cloud ci-dessous</div></div></div>') +
+      '<a class="row tap" href="' + SANTE_APK + '"><span class="tile" style="--c:#FF375F">' + ic('down') + '</span><div class="rt"><div class="t1">Installer l’appli Android My Coach</div><div class="t2">Samsung Health, notifications, voix écran verrouillé</div></div>' + ic('chev', 'chev') + '</a>' +
+      (CLOUD.token ? '<a class="row tap" href="' + esc(santeLink()) + '"><span class="tile" style="--c:#5E5CE6">' + ic('link') + '</span><div class="rt"><div class="t1">Transférer vers l’appli Android</div><div class="t2">Lui donne ta sauvegarde cloud en un geste</div></div>' + ic('chev', 'chev') + '</a>'
+        : '<div class="row"><span class="tile" style="--c:#8E8E93">' + ic('link') + '</span><div class="rt"><div class="t1" style="color:var(--t3)">Transférer vers l’appli Android</div><div class="t2">Active d’abord la sauvegarde cloud ci-dessous</div></div></div>') +
       (CLOUD.token ? row('repeat', '#0A84FF', 'Actualiser maintenant', 'Récupère les dernières données', 'santeRefresh') : '') + '</div>' +
-      '<div class="foot">L’appli My Coach Santé lit Samsung Health (via Health Connect) toutes les 2 heures et dépose tes données dans ton dépôt privé. My Coach coche alors tout seul « Sommeil 7 h+ » et « 8 000 pas », et ajoute tes pesées.</div>';
+      '<div class="foot">L’appli Android My Coach lit Samsung Health (via Health Connect) et dépose tes données dans ton dépôt privé toutes les 2 heures. My Coach coche alors tout seul « Sommeil 7 h+ » et « 8 000 pas », et ajoute tes pesées.</div>';
   }
   h += '<div class="lhd">Données et sauvegarde</div><div class="list ic">' +
     '<div class="row"><span class="tile" style="--c:' + (STORAGE_OK ? '#30D158' : '#FF9F0A') + '">' + ic(STORAGE_OK ? 'check' : 'info') + '</span><div class="rt"><div class="t1">Enregistrement automatique</div><div class="t2">' + (STORAGE_OK ? 'Sur ce téléphone · ' + (S.savedAt ? agoTxt(S.savedAt) : 'à chaque action') : 'Stockage indisponible : exporte tes données') + '</div></div></div>' +
@@ -3080,6 +3095,7 @@ function setSetting(path, val, type) {
   else if (k === 'name') obj[k] = String(val).trim().slice(0, 24);
   else obj[k] = val;
   save(); refresh(); rerenderSheet('settings');
+  if (k === 'remindTrain' || k === 'remindWeigh') natReminders();
 }
 
 /* ---------- rappels (.ics pour le calendrier du téléphone) ---------- */
@@ -3108,7 +3124,7 @@ function downloadBlob(blob, name, open) {
   document.body.appendChild(l); l.click(); l.remove();
   setTimeout(() => URL.revokeObjectURL(u), 8000);
 }
-function exportICS() { downloadBlob(new Blob([makeICS()], { type: 'text/calendar;charset=utf-8' }), 'my-coach-rappels.ics', true); toast('Rappels prêts à ajouter', 'bell', 'var(--red)'); }
+function exportICS() { if (NATIVE) { natOpenFile('my-coach-rappels.ics', 'text/calendar', b64enc(makeICS())); return; } downloadBlob(new Blob([makeICS()], { type: 'text/calendar;charset=utf-8' }), 'my-coach-rappels.ics', true); toast('Rappels prêts à ajouter', 'bell', 'var(--red)'); }
 
 /* ---------- sauvegarde ---------- */
 function exportData() {
@@ -3116,6 +3132,7 @@ function exportData() {
   const blob = new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' });
   let file = null; try { file = new File([blob], name, { type: 'application/json' }); } catch (e) { file = null; }
   S.lastExport = Date.now(); save();
+  if (NATIVE) { natShareFile(name, 'application/json', b64enc(JSON.stringify(S, null, 1)), 'Sauvegarde My Coach'); return; }
   if (file && navigator.canShare && navigator.canShare({ files: [file] })) navigator.share({ files: [file], title: 'Sauvegarde My Coach' }).catch(() => { });
   else { downloadBlob(blob, name); toast('Sauvegarde téléchargée', 'down', 'var(--blue)'); }
 }
@@ -3172,7 +3189,8 @@ function shopHTML() {
 }
 function shopShare() {
   const txt = 'Courses My Coach · ' + SHOP_DAYS + ' jours\n' + shopItems().map(i => '• ' + i.n + (i.q ? ' : ' + i.q.replace(/ /g, ' ') : '')).join('\n');
-  if (navigator.share) navigator.share({ title: 'Liste de courses', text: txt }).catch(() => { });
+  if (NATIVE) natShareText(txt, 'Liste de courses');
+  else if (navigator.share) navigator.share({ title: 'Liste de courses', text: txt }).catch(() => { });
   else if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => toast('Liste copiée', 'copy'), () => toast('Copie impossible', 'x', 'var(--red)'));
 }
 
@@ -3272,7 +3290,7 @@ function obHTML() {
     '<div style="display:flex;gap:10px"><button class="btn btn-f" data-act="obBack">' + ic('chevL') + '</button><button class="btn btn-p" style="flex:1" data-act="obNext">Continuer</button></div>';
   const w = parseNum(OB.weight), g = parseNum(OB.goal);
   return '<div class="ob-st" style="text-align:center;align-items:center"><div class="sum-badge" style="margin:0 auto 22px">' + ic('check') + '</div><h1>C’est parti' + (OB.name ? ', ' + esc(OB.name.trim()) : '') + '</h1><p class="lead">' + (!isNaN(w) && !isNaN(g) && w > g ? 'Objectif : −' + num(w - g, 1) + NB + 'kg. Un pas après l’autre : la régularité fera le travail.' : 'Ton programme est prêt.') + '</p>' +
-    '<p class="lead" style="font-size:14px;margin-top:18px">Astuce : ajoute l’app à ton écran d’accueil (Partager → « Sur l’écran d’accueil ») pour l’ouvrir en plein écran, même hors connexion.</p></div>' + dots +
+    (NATIVE ? '' : '<p class="lead" style="font-size:14px;margin-top:18px">Astuce : ajoute l’app à ton écran d’accueil (Partager → « Sur l’écran d’accueil ») pour l’ouvrir en plein écran, même hors connexion.</p>') + '</div>' + dots +
     '<button class="btn btn-p btn-b" data-act="obFinish">Entrer dans My Coach</button>';
 }
 function obCollect() { $$('[data-ob]').forEach(i => { OB[i.getAttribute('data-ob')] = i.value; }); }
@@ -3686,12 +3704,13 @@ function cloudConnect() {
     .then(r => {
       CLOUD_UI.busy = false; CLOUD_UI.tok = ''; saveCloud();
       if (r && r.p && r.p.data && !isEmptyState(r.p.data)) {
+        natCloud();
         if (isEmptyState(S)) { cloudRestoreFrom(r, 'Connecté · tes données sont de retour'); return null; }
         CLOUD.conflict = { sha: r.sha, savedAt: r.p.savedAt, device: r.p.device || 'un autre appareil', sum: stateSum(r.p.data), first: true }; saveCloud(); rerenderSheet('cloud');
         return null;
       }
       if (r) CLOUD.sha = r.sha;
-      saveCloud();
+      saveCloud(); natCloud();
       return cloudPush(true).then(ok => { if (ok) { toast('Sauvegarde cloud activée', 'cloudUp', 'var(--blue)'); haptic('success'); } });
     })
     .catch(e => {
@@ -3703,6 +3722,7 @@ function cloudConnect() {
 }
 function cloudDisconnect(silent) {
   if (!CLOUD.token) return;
+  natCloudClear();
   CLOUD.token = ''; CLOUD.sha = ''; CLOUD.conflict = null; CLOUD.err = ''; CLOUD.lastPush = 0; saveCloud(); clearTimeout(CLOUD_T);
   if (!silent) { toast('Sauvegarde cloud déconnectée', 'cloud', 'var(--gray)'); rerenderSheet('cloud'); softRerender('settings'); }
 }
@@ -3744,6 +3764,7 @@ function cloudHTML() {
 
 /* ---------- démarrage : récupération, point du jour, cloud ---------- */
 function bootData() {
+  natBoot();
   idbGet('state').then(raw => {
     let o = null; try { o = raw ? JSON.parse(raw) : null; } catch (e) { o = null; }
     if (o && o.profile && Array.isArray(o.sessions) && !isEmptyState(o)) {
@@ -3767,11 +3788,12 @@ window.addEventListener('online', () => { if (cloudDirty()) { CLOUD.err = ''; cl
    SAMSUNG HEALTH : données déposées par l'appli My Coach Santé (sante.json)
    ========================================================= */
 const HEALTH_KEY = 'mycoach:health';
-const SANTE_REL = 'https://github.com/KBO9/my-coach/releases/tag/sante';
-const SANTE_APK = 'https://github.com/KBO9/my-coach/releases/download/sante/my-coach-sante.apk';
+const SANTE_REL = 'https://github.com/KBO9/my-coach/releases/tag/android';
+const SANTE_APK = 'https://github.com/KBO9/my-coach/releases/download/android/my-coach.apk';
 let HEALTH = (function () { try { return JSON.parse(localStorage.getItem(HEALTH_KEY) || 'null'); } catch (e) { return null; } })();
 let HEALTH_SHA = '', HEALTH_T = 0, HN_CACHE = { at: -1, m: {} };
 function healthFetch(force) {
+  if (NATIVE) { if (force || Date.now() - NAT_HT > 120000) natHealthRead(false); return Promise.resolve(false); }
   if (!CLOUD.token || !CLOUD.owner) return Promise.resolve(false);
   if (!force && Date.now() - HEALTH_T < 10 * 60e3) return Promise.resolve(false);
   HEALTH_T = Date.now();
@@ -3909,7 +3931,7 @@ function vxEl() {
     VX.el = new Audio();
     VX.el.preload = 'auto';
     VX.el.setAttribute('playsinline', '');
-    VX.el.addEventListener('ended', () => { VX.kind = ''; try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none'; } catch (e) { /* ignore */ } });
+    VX.el.addEventListener('ended', () => { VX.kind = ''; natAudio(false); try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none'; } catch (e) { /* ignore */ } });
   }
   return VX.el;
 }
@@ -3937,12 +3959,14 @@ function vxPlay(blob, kind, meta) {
   el.src = VX.url;
   try { el.currentTime = 0; } catch (e) { /* ignore */ }
   const p = el.play();
-  if (p && p.then) p.then(() => { VX.unlocked = true; }).catch(() => { VX.kind = ''; }); else VX.unlocked = true;
+  if (p && p.then) p.then(() => { VX.unlocked = true; }).catch(() => { VX.kind = ''; natAudio(false); }); else VX.unlocked = true;
   vxMeta(meta);
+  if (meta) natAudio(true, meta.title, meta.dur || 0);
   return true;
 }
 function vxStop(kind) {
   if (kind && VX.kind !== kind) return;
+  if (VX.kind) natAudio(false);
   VX.kind = '';
   if (VX.el) { try { VX.el.pause(); } catch (e) { /* ignore */ } }
   try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none'; } catch (e) { /* ignore */ }
@@ -3963,7 +3987,7 @@ function vxSay(keys, title) {
   if (!vxOn()) return;
   if (!VX.idx) { vxLoad(); return; }
   if (vxActive() && VX.kind !== 'say') return; // ne coupe pas un minuteur en cours
-  vxPlay(vxTrack([{ t: 0.1, k: keys }], 0), 'say', { title: title || 'My Coach' });
+  vxPlay(vxTrack([{ t: 0.1, k: keys }], 0), 'say', { title: title || 'My Coach', dur: 12 });
 }
 function vxCheer() { VX.cheer = (VX.cheer + 1) % 3; return 'enc' + (VX.cheer + 1); }
 
@@ -3994,7 +4018,7 @@ function vxRest(sec, vi, resumed) {
     }
   }
   cues.push({ t: sec, k: end });
-  vxPlay(vxTrack(cues, sec + 5), 'rest', { title: 'Repos · ' + clock(sec), album: (vi && vi.album) || 'Séance' });
+  vxPlay(vxTrack(cues, sec + 5), 'rest', { title: 'Repos · ' + clock(sec), album: (vi && vi.album) || 'Séance', dur: sec + 6 });
 }
 
 /* ---------- minuteur : fractionné, gainage, tabata, zone 2 ---------- */
@@ -4038,7 +4062,89 @@ function vxTimer() {
   });
   const total = Math.max(0, segs[segs.length - 1].e) + 4;
   VX.endAt = Date.now() + (total - 4) * 1000;
-  vxPlay(vxTrack(cues, total), 'timer', { title: TM.name + (TM.k > 1 ? ' · ' + TM.k + ' tours' : ' · ' + clock(TM.w)), album: 'Minuteur' });
+  vxPlay(vxTrack(cues, total), 'timer', { title: TM.name + (TM.k > 1 ? ' · ' + TM.k + ' tours' : ' · ' + clock(TM.w)), album: 'Minuteur', dur: total });
+}
+
+/* =========================================================
+   APPLI ANDROID : pont avec le natif (window.MCNative)
+   Dans le navigateur, tout ceci est ignoré.
+   ========================================================= */
+const NATIVE = !!window.MCNative;
+let NAT_WAIT = false, NAT_HT = 0;
+function natAudio(on, title, sec) { if (NATIVE) try { MCNative.audio(!!on, String(title || 'Voix du coach'), Number(sec) || 0); } catch (e) { /* ignore */ } }
+function natRest(at, title, body) { if (NATIVE) try { MCNative.restAlarm(Number(at) || 0, String(title || ''), String(body || '')); } catch (e) { /* ignore */ } }
+function natHealthStatus() { if (!NATIVE) return null; try { return JSON.parse(MCNative.healthStatus()); } catch (e) { return null; } }
+function natShareFile(name, mime, b64, title) { try { MCNative.shareFile(name, mime, b64, title || name); return true; } catch (e) { return false; } }
+function natOpenFile(name, mime, b64) { try { MCNative.openFile(name, mime, b64); return true; } catch (e) { return false; } }
+function natShareText(text, title) { try { MCNative.shareText(text, title || ''); return true; } catch (e) { return false; } }
+function natHealthRead(manual) { if (!NATIVE) return; if (manual) NAT_WAIT = true; NAT_HT = Date.now(); try { MCNative.healthRead(); } catch (e) { /* ignore */ } }
+/* jeton de la sauvegarde cloud : partagé avec la synchro Samsung Health en arrière-plan */
+function natCloud() { if (NATIVE && CLOUD.token) try { MCNative.cloudSet(CLOUD.token, CLOUD.owner + '/' + CLOUD.repo); } catch (e) { /* ignore */ } }
+function natCloudClear() { if (NATIVE) try { MCNative.cloudSet('', ''); } catch (e) { /* ignore */ } }
+/* premier lancement de l'appli : récupère le jeton connu du téléphone et restaure tes données */
+function natCloudImport() {
+  if (!NATIVE || CLOUD.token) return false;
+  let nc = null; try { nc = JSON.parse(MCNative.cloudGet()); } catch (e) { nc = null; }
+  if (!nc || !nc.token || !nc.repo || nc.repo.indexOf('/') < 1) return false;
+  CLOUD.token = nc.token; CLOUD.owner = nc.repo.split('/')[0]; CLOUD.repo = nc.repo.split('/')[1];
+  CLOUD.sha = ''; CLOUD.lastPush = 0; CLOUD.err = ''; CLOUD.conflict = null; saveCloud();
+  if (isEmptyState(S)) cloudRestore('Tes données sont de retour');
+  else { CLOUD.lastCheck = 0; cloudCheck(); }
+  softRerender('settings');
+  return true;
+}
+/* rappels de séance et de pesée en notifications */
+function natReminders() {
+  if (!NATIVE) return;
+  const T = S.settings, R = [];
+  if (T.notifs !== false) {
+    const tp = String(T.remindTrain || '18:00').split(':'), wp = String(T.remindWeigh || '07:30').split(':');
+    if (T.mode === 'fixed') {
+      for (let d = 0; d < 7; d++) { const s = SESS[SCHED[d]]; if (isTrain(s)) R.push({ id: d, h: +tp[0], m: +tp[1], days: [d], t: 'Séance du jour : ' + s.name, b: plural(s.ex.length, 'exercice') + ' · environ ' + s.est + ' min. L’échauffement d’abord !' }); }
+    } else {
+      const s = SESS[ROT[S.rot % ROT.length]];
+      R.push({ id: 0, h: +tp[0], m: +tp[1], days: [0, 1, 2, 3, 4, 5, 6], t: 'Ta séance t’attend', b: 'Prochaine séance : ' + s.name + '.' });
+    }
+    R.push({ id: 9, h: +wp[0], m: +wp[1], days: [0, 1, 2, 3, 4, 5, 6], t: 'Pesée du matin', b: 'À jeun, après être passé aux toilettes. Note-la dans My Coach.' });
+  }
+  try { MCNative.reminders(JSON.stringify(R)); } catch (e) { /* ignore */ }
+}
+/* appelées par le natif */
+window.mcHealth = function (o) {
+  const wait = NAT_WAIT; NAT_WAIT = false;
+  if (!o || o.app !== 'my-coach-sante') { softRerender('settings'); if (wait) toast('Autorise d’abord l’accès à Samsung Health', 'info', 'var(--orange)'); return; }
+  HEALTH = o;
+  try { localStorage.setItem(HEALTH_KEY, JSON.stringify(o)); } catch (e) { /* ignore */ }
+  healthApplyWeights();
+  if (!SHEETS.length) refresh();
+  softRerender('settings'); softRerender('sleep');
+  if (wait) toast('Samsung Health à jour · ' + santeSum(), 'check');
+};
+window.mcHealthAuth = function (ok) {
+  softRerender('settings');
+  if (ok) toast('Accès à Samsung Health autorisé', 'check');
+  else toast('Il faut autoriser le sommeil, les pas et le poids', 'info', 'var(--orange)');
+};
+window.mcCloud = function () { natCloudImport(); };
+window.mcResume = function () {
+  if (Date.now() - NAT_HT > 120000) natHealthRead(false);
+  if (dkey() !== LAST_DAY && !SHEETS.length) refresh();
+  softRerender('settings');
+};
+/* bouton retour d'Android : ferme la feuille ouverte, sinon revient au Résumé */
+window.mcBack = function () {
+  if (SHEETS.length) { closeSheet(); return true; }
+  const isl = $('#island'); if (isl && isl.classList.contains('big')) { isl.classList.remove('big'); return true; }
+  if ($('#ob')) { if (OB.step > 0) { obCollect(); OB.step--; renderOB(); return true; } return false; }
+  if (TAB !== 'today') { go('today'); return true; }
+  return false;
+};
+function natBoot() {
+  if (!NATIVE) return;
+  natCloudImport();
+  natCloud();
+  natReminders();
+  natHealthRead(false);
 }
 
 /* =========================================================
@@ -4099,7 +4205,7 @@ const ACT = {
     if (n === 'tt') { day(dkey(), true).tt = v; save(); refresh(); }
     else if (n === 'prog') { PROG_SEG = v; refresh(); }
     else if (n === 'range') { RANGE = v; refresh(); }
-    else if (n === 'mode') { S.settings.mode = v; save(); refresh(); rerenderSheet('settings'); }
+    else if (n === 'mode') { S.settings.mode = v; save(); refresh(); rerenderSheet('settings'); natReminders(); }
     else if (n === 'train') { S.settings.trainTime = v; save(); refresh(); rerenderSheet('settings'); }
     else if (n === 'theme') { S.settings.theme = v; save(); applyTheme(); refresh(); rerenderSheet('settings'); }
     else if (n === 'shop') { SHOP_DAYS = +v; rerenderSheet('shop'); }
@@ -4200,6 +4306,7 @@ const ACT = {
   toggleSet: t => {
     const k = t.dataset.k; S.settings[k] = !S.settings[k]; save(); haptic(); rerenderSheet('settings'); refresh();
     if (k === 'sound' && S.settings.sound) sound('tick');
+    if (k === 'notifs') natReminders();
     if (k === 'voice') { if (S.settings.voice) { vxUnlock(); vxLoad().then(ok => { if (ok) vxSay(['voice_test'], 'Voix du coach'); rerenderSheet('settings'); }); } else vxStop(); }
   },
   waterGoal: t => { S.settings.waterGoal = clamp(S.settings.waterGoal + (+t.dataset.d), 4, 20); save(); haptic(); rerenderSheet('settings'); refresh(); },
@@ -4240,7 +4347,8 @@ const ACT = {
   snaps: () => openSnaps(),
   snapPick: t => snapPick(t.dataset.id),
   /* Samsung Health */
-  santeRefresh: () => { toast('Actualisation…', 'repeat', 'var(--blue)'); healthFetch(true).then(ch => { toast(ch ? 'Données Samsung Health à jour' : HEALTH ? 'Rien de nouveau pour l’instant' : 'Aucune donnée : ouvre l’appli My Coach Santé', ch ? 'check' : 'info', ch ? 'var(--green)' : 'var(--orange)'); softRerender('settings'); }); },
+  healthAuth: () => { if (NATIVE) try { MCNative.healthAuthorize(); } catch (e) { /* ignore */ } },
+  santeRefresh: () => { if (NATIVE) { toast('Lecture de Samsung Health…', 'repeat', 'var(--blue)'); natHealthRead(true); return; } toast('Actualisation…', 'repeat', 'var(--blue)'); healthFetch(true).then(ch => { toast(ch ? 'Données Samsung Health à jour' : HEALTH ? 'Rien de nouveau pour l’instant' : 'Aucune donnée : ouvre l’appli My Coach Santé', ch ? 'check' : 'info', ch ? 'var(--green)' : 'var(--orange)'); softRerender('settings'); }); },
   sleepSheet: () => openSheet({ id: 'sleep', cls: 'full', render: sleepSheetHTML }),
   /* voix */
   voiceTest: () => { vxUnlock(); vxLoad().then(ok => { if (ok) { vxStop(); vxSay(['voice_test'], 'Voix du coach'); } else toast('Voix indisponible : ouvre l’app une fois avec internet', 'info', 'var(--orange)'); rerenderSheet('settings'); }); }

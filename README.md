@@ -46,14 +46,21 @@ Le jeton reste uniquement sur le téléphone et ne donne accès qu'à ce dépôt
 
 Ce dépôt-ci (le code de l'app) est public, comme l'exige GitHub Pages gratuit : **aucune donnée personnelle n'y est enregistrée**.
 
-## Samsung Health (sommeil, pas, pesées)
+## Appli Android (conseillée sur Android)
 
-L'appli Android **My Coach Santé** lit Samsung Health (via Health Connect) toutes les 2 heures et dépose tes données dans ton dépôt privé `my-coach-data`. My Coach coche alors tout seul « Sommeil 7 h+ » et « 8 000 pas », affiche tes nuits (durée, phases, moyenne) et ajoute tes pesées (ta saisie manuelle reste prioritaire).
+L'appli **My Coach pour Android** contient tout My Coach, plus ce qu'une page web ne sait pas faire :
 
-1. Télécharge **my-coach-sante.apk** depuis la page [Releases → My Coach Santé](https://github.com/KBO9/my-coach/releases/tag/sante) et installe-le (autorise l'installation depuis ton navigateur si Android le demande).
-2. Ouvre My Coach Santé → **Autoriser** (sommeil, pas, poids, et l'accès en arrière-plan).
-3. Dans Samsung Health : **Paramètres → Health Connect** → autorise le sommeil, les pas et le poids.
-4. Dans My Coach : **Réglages → Samsung Health → Relier l'appli Santé**.
+- **Samsung Health** : sommeil (durée, phases), pas et pesées lus directement, via Health Connect. « Sommeil 7 h+ » et « 8 000 pas » se cochent tout seuls.
+- **Notifications** : « C'est reparti ! » à la fin de chaque repos, même écran verrouillé, et rappels de séance et de pesée à l'heure choisie.
+- **Voix du coach écran verrouillé**, plus fiable grâce au lecteur audio d'Android.
+- **Toujours à jour** : l'interface se charge depuis ce site, les améliorations arrivent toutes seules.
+
+Installation :
+
+1. Télécharge **my-coach.apk** depuis [Releases → My Coach pour Android](https://github.com/KBO9/my-coach/releases/tag/android) et installe-le (autorise l'installation depuis ton navigateur si Android le demande). Si My Coach Santé est installée, elle est simplement mise à jour.
+2. Ouvre My Coach : tes données reviennent toutes seules depuis ta sauvegarde GitHub (sinon : Réglages → Sauvegarde cloud).
+3. Autorise les notifications, puis Samsung Health (Réglages → Samsung Health) si ce n'est pas déjà fait.
+4. Dans Samsung Health : **Paramètres → Health Connect** → autorise le sommeil, les pas et le poids.
 
 L'APK est compilé automatiquement par GitHub à partir du dossier `android/`.
 
@@ -70,4 +77,4 @@ Voix générée hors ligne avec [Piper](https://github.com/rhasspy/piper) et le 
 | `manifest.webmanifest` | Nom, couleurs et icônes pour l'installation |
 | `sw.js` | Mode hors connexion |
 | `icon-*.png`, `apple-touch-icon.png` | Icônes de l'écran d'accueil |
-| `android/` | Code de l'appli Android My Coach Santé (compilée par GitHub) |
+| `android/` | Code de l'appli Android (compilée automatiquement par GitHub) |
