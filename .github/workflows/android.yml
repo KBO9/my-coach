@@ -1,4 +1,4 @@
-name: Appli My Coach Santé (APK)
+name: Appli Android My Coach (APK)
 
 on:
   push:
@@ -41,12 +41,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          cp android/app/build/outputs/apk/release/app-release.apk my-coach-sante.apk
-          if ! gh release view sante >/dev/null 2>&1; then
-            gh release create sante --title "My Coach Santé" --latest \
-              --notes "Appli Android qui envoie ton sommeil, tes pas et tes pesées de Samsung Health (via Health Connect) vers My Coach. Télécharge my-coach-sante.apk ci-dessous et installe-le."
+          cp android/app/build/outputs/apk/release/app-release.apk my-coach.apk
+          cp my-coach.apk my-coach-sante.apk
+          if ! gh release view android >/dev/null 2>&1; then
+            gh release create android --title "My Coach pour Android" --latest \
+              --notes "L'appli My Coach complète pour Android : séances, voix du coach écran verrouillé, notifications de fin de repos et de rappels, Samsung Health (sommeil, pas, pesées). Télécharge my-coach.apk ci-dessous et installe-le : il remplace My Coach Santé et garde tes réglages."
           fi
-          gh release upload sante my-coach-sante.apk --clobber
+          gh release upload android my-coach.apk --clobber
+          if gh release view sante >/dev/null 2>&1; then gh release upload sante my-coach-sante.apk --clobber; fi
 
       - name: Journal en cas d'échec
         if: failure()

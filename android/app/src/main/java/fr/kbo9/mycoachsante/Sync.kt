@@ -20,8 +20,9 @@ object Sync {
 
     /** Lit Health Connect et envoie sante.json ; renvoie un résumé. */
     suspend fun run(c: Context, why: String): String = withContext(Dispatchers.IO) {
-        if (!Prefs.linked(c)) throw IllegalStateException("Relie d’abord l’appli à My Coach (étape 3)")
+        if (!Prefs.linked(c)) throw IllegalStateException("Active la sauvegarde cloud dans My Coach")
         if (!Health.available(c)) throw IllegalStateException("Health Connect n’est pas disponible")
+        if (!Health.granted(c).containsAll(Health.DATA_PERMS)) throw IllegalStateException("Accès à Samsung Health non autorisé")
         val data = Health.collect(c)
         val stamp = SimpleDateFormat("d MMM HH:mm", Locale.FRANCE).format(Date())
         val sha = Github.put(Prefs.token(c), Prefs.repo(c), PATH, data.toString(), "Santé · $stamp ($why)", Prefs.sha(c))
