@@ -693,6 +693,21 @@ html[data-theme=light] .srow.warm .sn{color:#C99700}
 .cl-steps .t2{line-height:1.4;margin-top:3px}
 .stn{width:26px;height:26px;border-radius:13px;background:rgba(10,132,255,.14);color:var(--blue);font-weight:800;font-size:14px;display:grid;place-items:center;flex:none;font-family:var(--font-r)}
 a.row{color:inherit}
+/* ---------- sommeil et pas (Samsung Health) ---------- */
+.sante .sa-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.sante .k{font-size:12px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.03em}
+.sante .big{font-size:27px;margin:3px 0 2px}
+.stg{display:flex;height:10px;border-radius:5px;overflow:hidden;gap:2px;margin-top:14px;background:var(--fill2)}
+.stg i{display:block;min-width:3px}
+.stg-l{display:flex;flex-wrap:wrap;gap:5px 14px;margin-top:9px;font-size:12px;color:var(--t2)}
+.stg-l b{display:inline-block;width:8px;height:8px;border-radius:4px;margin-right:5px}
+.slb{position:relative;display:flex;gap:5px;height:150px;padding-top:6px}
+.slb .c{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+.slb .bw{flex:1;width:100%;position:relative}
+.slb .bw i{position:absolute;left:0;right:0;bottom:0;border-radius:6px 6px 3px 3px;transform-origin:bottom;animation:growY .8s var(--soft) both}
+@keyframes growY{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.slb .c span{font-size:11px;font-weight:600;color:var(--t3);height:16px;line-height:16px}
+.slb .goal{position:absolute;left:0;right:0;bottom:calc(21px + (100% - 27px) * .7);border-top:1.5px dashed rgba(125,122,255,.75);pointer-events:none}
 /* feuilles par-dessus l'écran de bienvenue */
 .ob ~ .layer{z-index:850}
 body:has(#ob) .toast{z-index:900}
@@ -1283,7 +1298,7 @@ function suppsCore(k) { const r = day(k); return CORE_SUPPS.filter(id => r.sp[id
 const HABITS = [
   { id: 'water', n: 'Eau', c: '#64D2FF', ic: 'drop' },
   { id: 'steps', n: '8 000 pas', c: '#30D158', ic: 'walk' },
-  { id: 'sleep', n: 'Sommeil 7 h+', c: '#5E5CE6', ic: 'moon' },
+  { id: 'sleep', n: 'Sommeil 7' + NB + 'h+', c: '#5E5CE6', ic: 'moon' },
   { id: 'supps', n: 'Compléments', c: '#BF5AF2', ic: 'pill' },
   { id: 'cann', n: 'Cannelle', c: '#FF9F0A', ic: 'leaf' },
   { id: 'weigh', n: 'Pesée', c: '#0A84FF', ic: 'scale' }
@@ -1293,7 +1308,11 @@ function habitVal(k, id) {
   if (id === 'water') return clamp(r.w / S.settings.waterGoal, 0, 1);
   if (id === 'supps') return suppsCore(k) / CORE_SUPPS.length;
   if (id === 'weigh') return S.weights.some(w => w.d === k) ? 1 : 0;
-  return r.h[id] ? 1 : 0;
+  if (r.h[id]) return 1;
+  /* Samsung Health (appli My Coach Santé) : sommeil et pas remplis automatiquement */
+  if (id === 'sleep' && typeof sleepOn === 'function') { const n = sleepOn(k); if (n) return clamp(n.min / 420, 0, 1); }
+  if (id === 'steps' && typeof stepsOn === 'function') { const n = stepsOn(k); if (n != null) return clamp(n / 8000, 0, 1); }
+  return 0;
 }
 function habitsScore(k) { return HABITS.reduce((a, h) => a + habitVal(k, h.id), 0); }
 
@@ -1885,6 +1904,7 @@ const TITLES = { today: 'Résumé', train: 'Entraînement', food: 'Nutrition', p
 let PROG_SEG = 'poids', RANGE = '3m', CAL_OFF = 0, LAST_WATER = -1, POP = null;
 
 function hm(sec) { sec = Math.max(0, sec); return Math.floor(sec / 3600) + ':' + pad(Math.floor((sec % 3600) / 60)); }
+function hmin(m) { m = Math.max(0, Math.round(m)); return Math.floor(m / 60) + NB + 'h' + NB + pad(m % 60); }
 function avatarBtn() {
   const n = (S.profile.name || '').trim();
   return '<button class="avatar" data-act="settings" aria-label="Profil et réglages">' + (n ? esc(n.charAt(0).toUpperCase()) : ic('person')) + '</button>';
@@ -1923,7 +1943,7 @@ function vToday() {
   h += heroCard(k) + weekStrip();
   h += '<div class="grid2">' + fastTile() + weightTile() + '</div>';
   h += '<div class="card"><div class="ch">' + ic('sparkle') + 'Habitudes du jour<span class="r">' + hDone + ' sur ' + HABITS.length + '</span></div><div class="hab">' + HABITS.map(habBtn).join('') + '</div></div>';
-  h += streakCard() + tipCard();
+  h += santeCard() + streakCard() + tipCard();
   return h;
 }
 function heroCard(k) {
@@ -1985,10 +2005,24 @@ function habBtn(hb) {
   if (hb.id === 'water') sub = num(r.w * S.settings.glass / 1000, 1) + ' / ' + num(S.settings.waterGoal * S.settings.glass / 1000, 1) + NB + 'L';
   else if (hb.id === 'supps') sub = suppsCore(k) + ' / ' + CORE_SUPPS.length;
   else if (hb.id === 'weigh') sub = on ? 'Faite' : 'À faire';
+  else if (hb.id === 'sleep' && !r.h.sleep && sleepOn(k)) sub = hmin(sleepOn(k).min);
+  else if (hb.id === 'steps' && !r.h.steps && stepsOn(k) != null) sub = num(stepsOn(k)) + ' pas';
   else sub = on ? 'Fait' : 'À faire';
   return '<button class="hb' + (on ? ' on' : '') + (POP === 'hab:' + hb.id ? ' pop' : '') + '" style="--hc:' + hb.c + ';--hrgb:' + hexRgb(hb.c) + '" data-act="habit" data-id="' + hb.id + '"' + (hb.id === 'water' ? ' data-lp="waterMinus"' : '') + '>' +
     '<div class="hr"><svg viewBox="0 0 64 64"><circle class="tr" cx="32" cy="32" r="29.5"/><circle class="pg" cx="32" cy="32" r="29.5" style="' + dashArc('hab:' + hb.id, v, 29.5) + '"/></svg><div class="hi">' + ic(hb.ic) + '</div></div>' +
     '<div class="hl"><b>' + hb.n + '</b>' + sub + '</div></button>';
+}
+/* sommeil et pas de Samsung Health (via l'appli My Coach Santé) */
+function santeCard() {
+  if (!HEALTH) return '';
+  const t = dkey(), tonight = sleepOn(t), n = tonight || sleepOn(addDays(t, -1)), steps = stepsOn(t), a7 = sleepAvg(7);
+  const dAt = dkey(new Date(HEALTH.at)), when = dAt === t ? hhmm(HEALTH.at) : relDay(dAt);
+  let h = '<div class="card sante tap" data-act="sleepSheet"><div class="ch">' + ic('moon') + '<span style="color:#7D7AFF">Sommeil et pas</span><span class="r">' + when + ic('chev') + '</span></div>';
+  h += '<div class="sa-row"><div><div class="k">' + (tonight ? 'Cette nuit' : 'Dernière nuit') + '</div><div class="big" style="color:#7D7AFF">' + (n ? hmin(n.min) : '—') + '</div><div class="tiny">' + (n ? hhmm(n.s) + ' → ' + hhmm(n.e) : 'Pas encore de nuit') + '</div></div>' +
+    '<div><div class="k">Pas aujourd’hui</div><div class="big" style="color:#30D158">' + (steps != null ? num(steps) : '—') + '</div><div class="bar" style="--c:#30D158;margin-top:7px"><i style="' + barW('steps', (steps || 0) / 8000) + '"></i></div></div></div>';
+  if (n && n.st) h += stageBar(n);
+  if (a7) h += '<div class="tiny" style="margin-top:10px">Moyenne sur 7 nuits : <b style="color:var(--t1)">' + hmin(a7) + '</b> · objectif 7 h</div>';
+  return h + '</div>';
 }
 function streakCard() {
   const n = streakNow(), t = dkey(), mon = weekMon(t), start = addDays(mon, -21);
@@ -3017,6 +3051,15 @@ function settingsHTML() {
   h += '<div class="lhd">Nutrition</div><div class="list"><div class="row"><div class="rt"><div class="t1">Objectif d’eau</div><div class="t2">' + T.waterGoal + ' verres de ' + (T.glass / 10) + ' cl</div></div><div class="stepper"><button data-act="waterGoal" data-d="-1" aria-label="Moins">' + ic('minus') + '</button><span class="sv">' + num(T.waterGoal * T.glass / 1000, 1) + NB + 'L</span><button data-act="waterGoal" data-d="1" aria-label="Plus">' + ic('plus') + '</button></div></div>' + swRow('Compléments optionnels', 'optSupps', 'Multivitamines, D3-K2, vitamine C') + '</div>';
   h += '<div class="lhd">Apparence</div>' + seg('theme', [['auto', 'Automatique'], ['light', 'Clair'], ['dark', 'Sombre']], T.theme);
   h += '<div class="lhd">Rappels</div><div class="list">' + fieldRow('Séance', 'time', 'settings.remindTrain', T.remindTrain) + fieldRow('Pesée', 'time', 'settings.remindWeigh', T.remindWeigh) + '<div class="row tap" data-act="ics"><span class="tile" style="--c:#FF453A">' + ic('bell') + '</span><div class="rt"><div class="t1" style="color:var(--blue)">Ajouter à mon calendrier</div></div></div></div><div class="foot">Les rappels sont créés dans le calendrier de ton téléphone : ils sonnent même quand l’app est fermée.</div>';
+  if (/Android/.test(navigator.userAgent) || HEALTH) {
+    h += '<div class="lhd">Samsung Health</div><div class="list ic">' +
+      '<div class="row"><span class="tile" style="--c:' + (HEALTH ? '#30D158' : '#8E8E93') + '">' + ic(HEALTH ? 'check' : 'moon') + '</span><div class="rt"><div class="t1">' + (HEALTH ? 'Données reçues' : 'Pas encore relié') + '</div><div class="t2">' + (HEALTH ? cap(agoTxt(HEALTH.at)) + ' · ' + santeSum() : 'Sommeil, pas et pesées, automatiquement') + '</div></div></div>' +
+      '<a class="row tap" href="' + SANTE_APK + '"><span class="tile" style="--c:#FF375F">' + ic('down') + '</span><div class="rt"><div class="t1">Installer l’appli My Coach Santé</div><div class="t2">Fichier APK, à installer une seule fois</div></div>' + ic('chev', 'chev') + '</a>' +
+      (CLOUD.token ? '<a class="row tap" href="' + esc(santeLink()) + '"><span class="tile" style="--c:#5E5CE6">' + ic('link') + '</span><div class="rt"><div class="t1">Relier l’appli Santé</div><div class="t2">Lui transmet ta sauvegarde cloud en un geste</div></div>' + ic('chev', 'chev') + '</a>'
+        : '<div class="row"><span class="tile" style="--c:#8E8E93">' + ic('link') + '</span><div class="rt"><div class="t1" style="color:var(--t3)">Relier l’appli Santé</div><div class="t2">Active d’abord la sauvegarde cloud ci-dessous</div></div></div>') +
+      (CLOUD.token ? row('repeat', '#0A84FF', 'Actualiser maintenant', 'Récupère les dernières données', 'santeRefresh') : '') + '</div>' +
+      '<div class="foot">L’appli My Coach Santé lit Samsung Health (via Health Connect) toutes les 2 heures et dépose tes données dans ton dépôt privé. My Coach coche alors tout seul « Sommeil 7 h+ » et « 8 000 pas », et ajoute tes pesées.</div>';
+  }
   h += '<div class="lhd">Données et sauvegarde</div><div class="list ic">' +
     '<div class="row"><span class="tile" style="--c:' + (STORAGE_OK ? '#30D158' : '#FF9F0A') + '">' + ic(STORAGE_OK ? 'check' : 'info') + '</span><div class="rt"><div class="t1">Enregistrement automatique</div><div class="t2">' + (STORAGE_OK ? 'Sur ce téléphone · ' + (S.savedAt ? agoTxt(S.savedAt) : 'à chaque action') : 'Stockage indisponible : exporte tes données') + '</div></div></div>' +
     row('cloudUp', '#0A84FF', 'Sauvegarde cloud', cloudStatusTxt(), 'cloud') +
@@ -3711,12 +3754,98 @@ function bootData() {
   }).catch(() => { }).then(dailySnapshot);
   if (S.onboarded) requestPersist();
   if (CLOUD.token) setTimeout(cloudCheck, 2500);
+  if (HEALTH) healthApplyWeights();
+  if (CLOUD.token) setTimeout(() => { healthFetch(true); }, 3500);
 }
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') { if (cloudDirty() && CLOUD.auto && !CLOUD.conflict) cloudPush(false); }
-  else { dailySnapshot(); if (CLOUD.token && Date.now() - (CLOUD.lastCheck || 0) > 5 * 60e3) cloudCheck(); else if (cloudDirty()) cloudSchedule(3000); }
+  else { dailySnapshot(); healthFetch(false); if (CLOUD.token && Date.now() - (CLOUD.lastCheck || 0) > 5 * 60e3) cloudCheck(); else if (cloudDirty()) cloudSchedule(3000); }
 });
 window.addEventListener('online', () => { if (cloudDirty()) { CLOUD.err = ''; cloudSchedule(2000); } });
+
+/* =========================================================
+   SAMSUNG HEALTH : données déposées par l'appli My Coach Santé (sante.json)
+   ========================================================= */
+const HEALTH_KEY = 'mycoach:health';
+const SANTE_REL = 'https://github.com/KBO9/my-coach/releases/tag/sante';
+const SANTE_APK = 'https://github.com/KBO9/my-coach/releases/download/sante/my-coach-sante.apk';
+let HEALTH = (function () { try { return JSON.parse(localStorage.getItem(HEALTH_KEY) || 'null'); } catch (e) { return null; } })();
+let HEALTH_SHA = '', HEALTH_T = 0, HN_CACHE = { at: -1, m: {} };
+function healthFetch(force) {
+  if (!CLOUD.token || !CLOUD.owner) return Promise.resolve(false);
+  if (!force && Date.now() - HEALTH_T < 10 * 60e3) return Promise.resolve(false);
+  HEALTH_T = Date.now();
+  const path = '/repos/' + encodeURIComponent(CLOUD.owner) + '/' + encodeURIComponent(CLOUD.repo) + '/contents/sante.json';
+  return ghApi('GET', path).then(j => {
+    if (!j || !j.content || j.sha === HEALTH_SHA) return false;
+    HEALTH_SHA = j.sha;
+    const o = JSON.parse(b64dec(j.content));
+    if (!o || o.app !== 'my-coach-sante') return false;
+    const changed = !HEALTH || HEALTH.at !== o.at;
+    HEALTH = o;
+    try { localStorage.setItem(HEALTH_KEY, JSON.stringify(o)); } catch (e) { /* ignore */ }
+    healthApplyWeights();
+    if (changed) { if (!SHEETS.length) refresh(); softRerender('settings'); softRerender('sleep'); }
+    return changed;
+  }).catch(() => false);
+}
+/* pesées de la balance : ajoutées si tu n'as rien noté ce jour-là (ta saisie reste prioritaire) */
+function healthApplyWeights() {
+  if (!HEALTH || !Array.isArray(HEALTH.weight)) return;
+  const byDay = {};
+  HEALTH.weight.forEach(w => { if (!(w.kg > 25 && w.kg < 300) || !w.t) return; const d = dkey(new Date(w.t)); if (!byDay[d] || w.t > byDay[d].t) byDay[d] = w; });
+  let ch = false;
+  Object.keys(byDay).forEach(d => {
+    const kgv = Math.round(byDay[d].kg * 10) / 10, ex = S.weights.find(x => x.d === d);
+    if (!ex) { S.weights.push({ d: d, kg: kgv, src: 'sh' }); ch = true; }
+    else if (ex.src === 'sh' && ex.kg !== kgv) { ex.kg = kgv; ch = true; }
+  });
+  if (ch) { S.weights.sort((a, b) => (a.d < b.d ? -1 : 1)); save(); }
+}
+/* nuits par jour de réveil ; siestes de moins de 1 h 30 ignorées, sessions qui se chevauchent fusionnées */
+function healthNights() {
+  if (!HEALTH || !Array.isArray(HEALTH.sleep)) return {};
+  if (HN_CACHE.at === HEALTH.at) return HN_CACHE.m;
+  const by = {}, m = {};
+  HEALTH.sleep.forEach(x => { if (!(x.e > x.s) || (x.e - x.s) / 60000 < 90) return; const d = dkey(new Date(x.e)); (by[d] = by[d] || []).push(x); });
+  Object.keys(by).forEach(d => {
+    const L = by[d].sort((a, b) => a.s - b.s);
+    let union = 0, cs = -1, ce = -1;
+    L.forEach(x => { if (x.s > ce) { if (ce > cs) union += ce - cs; cs = x.s; ce = x.e; } else ce = Math.max(ce, x.e); });
+    if (ce > cs) union += ce - cs;
+    const main = L.reduce((a, b) => (b.e - b.s > a.e - a.s ? b : a));
+    m[d] = { min: Math.max(0, Math.round(union / 60000 - (main.awake || 0))), s: L[0].s, e: Math.max.apply(null, L.map(x => x.e)), st: main.deep != null,
+      deep: main.deep || 0, rem: main.rem || 0, light: (main.light || 0) + (main.sleeping || 0), awake: main.awake || 0 };
+  });
+  HN_CACHE = { at: HEALTH.at, m: m };
+  return m;
+}
+function sleepOn(k) { return healthNights()[k] || null; }
+function stepsOn(k) { return HEALTH && HEALTH.steps && HEALTH.steps[k] != null ? HEALTH.steps[k] : null; }
+function sleepAvg(n) { const m = healthNights(); let s = 0, c = 0; for (let i = 0; i < n; i++) { const x = m[addDays(dkey(), -i)]; if (x) { s += x.min; c++; } } return c ? s / c : null; }
+function santeSum() { return plural(Object.keys(healthNights()).length, 'nuit') + ' · ' + plural(Object.keys((HEALTH && HEALTH.steps) || {}).length, 'jour') + ' de pas'; }
+/* lien qui ouvre l'appli Santé et lui transmet la sauvegarde cloud (jeton + dépôt) */
+function santeLink() {
+  const q = 't=' + encodeURIComponent(CLOUD.token) + '&r=' + encodeURIComponent(CLOUD.owner + '/' + CLOUD.repo);
+  return 'intent://setup?' + q + '#Intent;scheme=mycoachsante;package=fr.kbo9.mycoachsante;S.browser_fallback_url=' + encodeURIComponent(SANTE_REL) + ';end';
+}
+function sleepSheetHTML() {
+  const m = healthNights(), days = Object.keys(m).sort().reverse().slice(0, 14);
+  let h = shHead('Sommeil') + '<div class="sh-body">';
+  if (!days.length) return h + emptyState('moon', 'Pas encore de nuit', 'Porte ta montre la nuit, ou active la détection du sommeil dans Samsung Health. Les nuits arrivent ici automatiquement.', '') + '</div>';
+  const a7 = sleepAvg(7), a14 = sleepAvg(14), ok = days.filter(d => m[d].min >= 420).length, last = m[days[0]];
+  h += '<div class="kpis">' + kpi('Dernière nuit', hmin(last.min), '', hhmm(last.s) + ' → ' + hhmm(last.e)) + kpi('Moyenne 7 nuits', a7 ? hmin(a7) : '—', '', 'Objectif 7 h') + kpi('Moyenne 14 nuits', a14 ? hmin(a14) : '—', '', 'Tendance') + kpi('Nuits de 7 h+', ok + '/' + days.length, '', 'Sur 14 jours') + '</div>';
+  const chart = days.slice().reverse();
+  h += '<div class="card"><div class="ch">' + ic('chart') + 'Durée par nuit<span class="r">objectif 7 h</span></div><div class="slb">' + chart.map(d => { const n = m[d]; return '<div class="c"><div class="bw"><i style="height:' + (clamp(n.min / 600, 0.03, 1) * 100).toFixed(1) + '%;background:' + (n.min >= 420 ? '#5E5CE6' : 'rgba(94,92,230,.45)') + '"></i></div><span>' + JOURS_C[parseD(d).getDay()].charAt(0) + '</span></div>'; }).join('') + '<b class="goal"></b></div></div>';
+  if (last.st) h += '<div class="card"><div class="ch">' + ic('moon') + 'Phases de la dernière nuit</div>' + stageBar(last) + '</div>';
+  h += '<div class="list">' + days.map(d => { const n = m[d]; return '<div class="row"><div class="rt"><div class="t1" style="font-size:16px">' + cap(relDay(d)) + '</div><div class="t2">' + hhmm(n.s) + ' → ' + hhmm(n.e) + (n.st ? ' · profond ' + hmin(n.deep) : '') + '</div></div><div class="rv" style="font-size:16px;font-weight:600;color:' + (n.min >= 420 ? 'var(--green)' : 'var(--t1)') + '">' + hmin(n.min) + '</div></div>'; }).join('') + '</div>';
+  h += '<div class="foot">Données de Samsung Health reçues ' + agoTxt(HEALTH.at) + ' grâce à l’appli My Coach Santé. Une nuit compte pour le jour du réveil ; les siestes de moins d’1 h 30 ne sont pas comptées.</div>';
+  return h + '</div>';
+}
+function stageBar(n) {
+  const seg = [['deep', 'Profond', '#5E5CE6'], ['rem', 'Paradoxal', '#64D2FF'], ['light', 'Léger', '#0A84FF'], ['awake', 'Éveillé', '#FF9F0A']];
+  return '<div class="stg">' + seg.map(s => '<i style="flex:' + (n[s[0]] || 0) + ';background:' + s[2] + '"></i>').join('') + '</div><div class="stg-l">' + seg.map(s => '<span><b style="background:' + s[2] + '"></b>' + s[1] + ' ' + hmin(n[s[0]] || 0) + '</span>').join('') + '</div>';
+}
 
 /* =========================================================
    VOIX DU COACH
@@ -4110,6 +4239,9 @@ const ACT = {
   cloudOff: () => confirmDlg('Déconnecter la sauvegarde cloud ?', 'Tes données restent sur ce téléphone et sur GitHub. Le jeton est effacé de ce téléphone.', 'Déconnecter', true, () => cloudDisconnect()),
   snaps: () => openSnaps(),
   snapPick: t => snapPick(t.dataset.id),
+  /* Samsung Health */
+  santeRefresh: () => { toast('Actualisation…', 'repeat', 'var(--blue)'); healthFetch(true).then(ch => { toast(ch ? 'Données Samsung Health à jour' : HEALTH ? 'Rien de nouveau pour l’instant' : 'Aucune donnée : ouvre l’appli My Coach Santé', ch ? 'check' : 'info', ch ? 'var(--green)' : 'var(--orange)'); softRerender('settings'); }); },
+  sleepSheet: () => openSheet({ id: 'sleep', cls: 'full', render: sleepSheetHTML }),
   /* voix */
   voiceTest: () => { vxUnlock(); vxLoad().then(ok => { if (ok) { vxStop(); vxSay(['voice_test'], 'Voix du coach'); } else toast('Voix indisponible : ouvre l’app une fois avec internet', 'info', 'var(--orange)'); rerenderSheet('settings'); }); }
 };

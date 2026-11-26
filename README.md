@@ -46,6 +46,17 @@ Le jeton reste uniquement sur le téléphone et ne donne accès qu'à ce dépôt
 
 Ce dépôt-ci (le code de l'app) est public, comme l'exige GitHub Pages gratuit : **aucune donnée personnelle n'y est enregistrée**.
 
+## Samsung Health (sommeil, pas, pesées)
+
+L'appli Android **My Coach Santé** lit Samsung Health (via Health Connect) toutes les 2 heures et dépose tes données dans ton dépôt privé `my-coach-data`. My Coach coche alors tout seul « Sommeil 7 h+ » et « 8 000 pas », affiche tes nuits (durée, phases, moyenne) et ajoute tes pesées (ta saisie manuelle reste prioritaire).
+
+1. Télécharge **my-coach-sante.apk** depuis la page [Releases → My Coach Santé](https://github.com/KBO9/my-coach/releases/tag/sante) et installe-le (autorise l'installation depuis ton navigateur si Android le demande).
+2. Ouvre My Coach Santé → **Autoriser** (sommeil, pas, poids, et l'accès en arrière-plan).
+3. Dans Samsung Health : **Paramètres → Health Connect** → autorise le sommeil, les pas et le poids.
+4. Dans My Coach : **Réglages → Samsung Health → Relier l'appli Santé**.
+
+L'APK est compilé automatiquement par GitHub à partir du dossier `android/`.
+
 ## Voix
 
 Voix générée hors ligne avec [Piper](https://github.com/rhasspy/piper) et le modèle français « tom » ([Tjiho](https://git.bksp.space/Tjiho/French-tts-model-piper), licence AGPL-3.0), rendue plus grave et plus posée. Chaque minuteur est assemblé en une piste audio : c'est ce qui permet à la voix de continuer quand l'iPhone est verrouillé. Pendant un repos, une musique lancée depuis une autre appli se met en pause (option « Garder ma musique » dans les réglages si ton iPhone la propose).
@@ -59,3 +70,4 @@ Voix générée hors ligne avec [Piper](https://github.com/rhasspy/piper) et le 
 | `manifest.webmanifest` | Nom, couleurs et icônes pour l'installation |
 | `sw.js` | Mode hors connexion |
 | `icon-*.png`, `apple-touch-icon.png` | Icônes de l'écran d'accueil |
+| `android/` | Code de l'appli Android My Coach Santé (compilée par GitHub) |
