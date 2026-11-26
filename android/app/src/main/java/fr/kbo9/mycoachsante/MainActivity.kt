@@ -68,6 +68,8 @@ class MainActivity : ComponentActivity() {
         askNotif = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
         Notifs.channels(this)
+        Coach.onReady = { js("window.mcVoices && mcVoices()") }
+        Coach.init(this)
         val night = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
         web = WebView(this)
         web.setBackgroundColor(if (night) Color.BLACK else Color.rgb(242, 242, 247))
@@ -142,6 +144,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        Coach.refresh()
         lifecycleScope.launch {
             granted = try {
                 if (Health.available(this@MainActivity)) Health.granted(this@MainActivity) else emptySet()
@@ -293,6 +296,14 @@ class MainActivity : ComponentActivity() {
         val ctl = WindowInsetsControllerCompat(window, window.decorView)
         ctl.isAppearanceLightStatusBars = !dark
         ctl.isAppearanceLightNavigationBars = !dark
+    }
+
+    fun openTtsSettings() {
+        try {
+            startActivity(Intent("com.android.settings.TTS_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: Exception) {
+            js("window.toast && toast('Ouvre Paramètres → Gestion globale → Synthèse vocale', 'info', 'var(--orange)')")
+        }
     }
 
     fun reload() {

@@ -24,7 +24,7 @@ Une fois installée, l'app s'ouvre en plein écran et fonctionne hors connexion 
 
 - **Séances guidées** : paliers, charge et reps suggérées, chrono de repos dans l'île dynamique, records détectés automatiquement.
 - **Exercices à la carte** : ajoute, remplace ou retire un exo pendant la séance (machine prise…), modifie ton programme (ajouter, retirer, réordonner, revenir au programme du coach) et crée tes propres exercices. La bibliothèque ne propose que des variantes douces pour le dos.
-- **Voix du coach** : une voix d'homme grave annonce le repos, les 10 dernières secondes, le décompte, la série ou l'exercice suivant, et toutes les phases du minuteur (fractionné, gainage, zone 2). Elle continue **écran verrouillé, écouteurs branchés**.
+- **Voix du coach** : une voix d'homme annonce le repos, les 10 dernières secondes, le décompte, la série ou l'exercice suivant (avec les reps et la charge visées), et toutes les phases du minuteur (fractionné, gainage, zone 2). Elle continue **écran verrouillé, écouteurs branchés**. Dans l'appli Android, c'est la voix naturelle du téléphone (Google ou Samsung), au choix.
 - **Diète, jeûne, compléments, liste de courses**, suivi du poids (tendance lissée), mensurations, régularité et trophées.
 
 ## Tes données
@@ -52,7 +52,7 @@ L'appli **My Coach pour Android** contient tout My Coach, plus ce qu'une page we
 
 - **Samsung Health** : sommeil (durée, phases), pas et pesées lus directement, via Health Connect. « Sommeil 7 h+ » et « 8 000 pas » se cochent tout seuls.
 - **Notifications** : « C'est reparti ! » à la fin de chaque repos, même écran verrouillé, et rappels de séance et de pesée à l'heure choisie.
-- **Voix du coach écran verrouillé**, plus fiable grâce au lecteur audio d'Android.
+- **Voix naturelle** : le coach parle avec les voix de synthèse du téléphone (Google ou Samsung), bien plus naturelles. Ta musique baisse le temps de la phrase au lieu de s'arrêter. Choix de la voix : Réglages → Voix du coach → Voix.
 - **Toujours à jour** : l'interface se charge depuis ce site, les améliorations arrivent toutes seules.
 
 Installation :
@@ -66,7 +66,9 @@ L'APK est compilé automatiquement par GitHub à partir du dossier `android/`.
 
 ## Voix
 
-Voix générée hors ligne avec [Piper](https://github.com/rhasspy/piper) et le modèle français « tom » ([Tjiho](https://git.bksp.space/Tjiho/French-tts-model-piper), licence AGPL-3.0), rendue plus grave et plus posée. Chaque minuteur est assemblé en une piste audio : c'est ce qui permet à la voix de continuer quand l'iPhone est verrouillé. Pendant un repos, une musique lancée depuis une autre appli se met en pause (option « Garder ma musique » dans les réglages si ton iPhone la propose).
+**Appli Android** : la voix est celle de la synthèse vocale du téléphone (Google ou Samsung). Pour d'autres voix : Paramètres Android → Gestion globale → Synthèse vocale → moteur → installer les données vocales (français).
+
+**Navigateur (iPhone)** : voix générée hors ligne avec [Piper](https://github.com/rhasspy/piper) et le modèle français « tom » ([Tjiho](https://git.bksp.space/Tjiho/French-tts-model-piper), licence AGPL-3.0). Chaque minuteur est assemblé en une piste audio : c'est ce qui permet à la voix de continuer quand l'iPhone est verrouillé. Pendant un repos, une musique lancée depuis une autre appli se met en pause (option « Garder ma musique » dans les réglages si ton iPhone la propose).
 
 ## Fichiers
 

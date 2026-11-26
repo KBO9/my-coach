@@ -2554,14 +2554,15 @@ function nextInfo(a, i, j) {
     const rem = ae.sets.filter(s => !s.done && s.t !== 'd').length;
     const sg = x.i < ex.s.length ? suggest(ex, x.i, lastPerf(ex.id)) : { r: null };
     const v = parseNum(x.r) || sg.r || x.target;
-    return { album: album, next: { kind: 'set', n: n, last: rem === 1, reps: ex.mode ? null : v, sec: ex.mode === 'sec' ? v : null } };
+    const w = !ex.mode && ex.load !== 'pdc' ? (parseNum(x.w) || sg.w || 0) : 0;
+    return { album: album, next: { kind: 'set', n: n, last: rem === 1, reps: ex.mode ? null : v, sec: ex.mode === 'sec' ? v : null, w: w } };
   }
   const pos = a.order.indexOf(i), ni = a.order.slice(pos + 1).find(q => a.ex[q].sets.some(s => !s.done));
   if (ni == null) return { album: album, next: null };
   const nex = EXI[a.ex[ni].id], x0 = a.ex[ni].sets.find(s => !s.done);
   const sg0 = x0 && x0.i < nex.s.length ? suggest(nex, x0.i, lastPerf(nex.id)) : { r: null };
   const v0 = sg0.r || (x0 && x0.target);
-  return { album: album, next: { kind: 'ex', id: nex.id, reps: nex.mode ? null : v0, sec: nex.mode === 'sec' ? v0 : null } };
+  return { album: album, next: { kind: 'ex', id: nex.id, reps: nex.mode ? null : v0, sec: nex.mode === 'sec' ? v0 : null, w: !nex.mode && nex.load !== 'pdc' ? (sg0.w || 0) : 0 } };
 }
 function setCheck(i, j, auto) {
   const a = S.active; if (!a) return;
@@ -3052,8 +3053,9 @@ function settingsHTML() {
   h += '<div class="lhd">Je m’entraîne plutôt le</div>' + seg('train', [['matin', 'Matin'], ['aprem', 'Après-midi'], ['soir', 'Soir']], T.trainTime) + '<div class="list">' + fieldRow('Heure du coucher', 'time', 'settings.bedtime', T.bedtime) + '</div><div class="foot">Ton planning de repas suit les consignes du coach selon l’heure de ta séance, et le dîner se cale 1 h 30 à 2 h avant de dormir.</div>';
   h += '<div class="lhd">Séance</div><div class="list">' + swRow('Repos automatique', 'restAuto', 'Lance le chrono à chaque série validée') + swRow('Sons', 'sound') + swRow('Vibrations', 'haptics') + swRow('Garder l’écran allumé', 'keepAwake') + '</div>';
   h += '<div class="lhd">Voix du coach</div><div class="list">' + swRow('Voix du coach', 'voice', 'Repos, séries, minuteurs, même écran verrouillé') +
-    (T.voice ? swRow('Annoncer l’exercice suivant', 'voiceNames', 'Nom de l’exo et objectif de reps') + swRow('Encouragements', 'voiceCheer', 'Pendant le fractionné et le cardio') + (VX_MIX_OK ? swRow('Garder ma musique', 'voiceMix', 'La voix se mêle à ta musique, mais se tait écran verrouillé') : '') + '<div class="row tap" data-act="voiceTest"><span class="tile" style="--c:#5E5CE6">' + ic('speaker') + '</span><div class="rt"><div class="t1" style="color:var(--blue)">Écouter la voix</div><div class="t2">' + (VX.state === 'err' ? 'Voix indisponible hors connexion pour l’instant' : 'Mets tes écouteurs') + '</div></div></div>' : '') + '</div>' +
-    '<div class="foot">' + (T.voice ? (T.voiceMix ? 'La voix se mélange à ta musique tant que l’écran est allumé.' : 'La voix est préparée comme une piste audio : elle continue écran verrouillé, écouteurs branchés. Pendant un repos ou un minuteur, une musique lancée depuis une autre appli se met en pause.') : 'Une voix d’homme grave annonce tes repos, tes séries et les phases de tes minuteurs.') + '</div>';
+    (T.voice && NATIVE ? (function () { const d = natVoices(), vs = (d && d.voices) || [], ci = vs.findIndex(v => v.cur); return row('speaker', '#5E5CE6', 'Voix', ci >= 0 ? natVoiceLabel(vs[ci], ci) + (vs[ci].net ? ' · en ligne' : '') : (d && d.ready ? 'Choisis une voix française' : 'Synthèse vocale d’Android'), 'voicePick'); })() : '') +
+    (T.voice ? swRow('Annoncer l’exercice suivant', 'voiceNames', 'Nom de l’exo, reps et charge visées') + swRow('Encouragements', 'voiceCheer', 'Pendant le fractionné et le cardio') + (VX_MIX_OK ? swRow('Garder ma musique', 'voiceMix', 'La voix se mêle à ta musique, mais se tait écran verrouillé') : '') + '<div class="row tap" data-act="voiceTest"><span class="tile" style="--c:#5E5CE6">' + ic('speaker') + '</span><div class="rt"><div class="t1" style="color:var(--blue)">Écouter la voix</div><div class="t2">' + (VX.state === 'err' ? 'Voix indisponible hors connexion pour l’instant' : 'Mets tes écouteurs') + '</div></div></div>' : '') + '</div>' +
+    '<div class="foot">' + (T.voice && NATIVE ? 'Voix naturelle d’Android : elle parle écran verrouillé, et ta musique baisse le temps de la phrase au lieu de s’arrêter.' : T.voice ? (T.voiceMix ? 'La voix se mélange à ta musique tant que l’écran est allumé.' : 'La voix est préparée comme une piste audio : elle continue écran verrouillé, écouteurs branchés. Pendant un repos ou un minuteur, une musique lancée depuis une autre appli se met en pause.') : 'Une voix d’homme grave annonce tes repos, tes séries et les phases de tes minuteurs.') + '</div>';
   h += '<div class="lhd">Nutrition</div><div class="list"><div class="row"><div class="rt"><div class="t1">Objectif d’eau</div><div class="t2">' + T.waterGoal + ' verres de ' + (T.glass / 10) + ' cl</div></div><div class="stepper"><button data-act="waterGoal" data-d="-1" aria-label="Moins">' + ic('minus') + '</button><span class="sv">' + num(T.waterGoal * T.glass / 1000, 1) + NB + 'L</span><button data-act="waterGoal" data-d="1" aria-label="Plus">' + ic('plus') + '</button></div></div>' + swRow('Compléments optionnels', 'optSupps', 'Multivitamines, D3-K2, vitamine C') + '</div>';
   h += '<div class="lhd">Apparence</div>' + seg('theme', [['auto', 'Automatique'], ['light', 'Clair'], ['dark', 'Sombre']], T.theme);
   if (NATIVE) h += '<div class="lhd">Rappels</div><div class="list">' + swRow('Notifications de rappel', 'notifs', 'Séance et pesée, à l’heure choisie') + fieldRow('Séance', 'time', 'settings.remindTrain', T.remindTrain) + fieldRow('Pesée', 'time', 'settings.remindWeigh', T.remindWeigh) + '</div><div class="foot">À la fin de chaque repos, une notification « C’est reparti » s’affiche aussi quand le téléphone est verrouillé.</div>';
@@ -3949,7 +3951,30 @@ function vxUnlock() {
     if (p && p.then) p.then(() => { VX.unlocked = true; }).catch(() => { }); else VX.unlocked = true;
   } catch (e) { /* ignore */ }
 }
-function vxActive() { return !!(VX.el && !VX.el.paused && VX.kind); }
+function vxActive() { return !!(VX.kind && ((VX.el && !VX.el.paused) || Date.now() < (VX.until || 0))); }
+/* textes des annonces (voix naturelle d'Android) */
+const VX_FIX = { go: 'C’est reparti !', go2: 'Allez, on y retourne !', rest: 'Repos.', t10: 'Plus que dix secondes.', t30: 'Encore trente secondes.', n3: 'Trois.', n2: 'Deux.', n1: 'Un.',
+  set_last: 'Dernière série !', next_ex: 'Exercice suivant :', max: 'Maximum de répétitions.', pr: 'Nouveau record. Bravo !', start: 'C’est parti. Bonne séance !', warm: 'On commence par l’échauffement.',
+  done: 'Séance terminée. Beau travail !', work: 'Accélère !', work2: 'À fond !', recover: 'Récupère.', round_last: 'Dernier tour !', half: 'Mi-parcours. Continue comme ça.', tm_go: 'C’est parti !',
+  tm_done: 'Terminé. Bravo !', hold_go: 'Tiens la position.', hold_rel: 'Relâche.', ready: 'Prépare-toi.', keep: 'Garde ce rythme.', breathe: 'Respire. Reste régulier.', last_min: 'Dernière minute !',
+  enc1: 'Allez, encore un effort.', enc2: 'Tu gères.', enc3: 'Reste concentré.', voice_test: 'Salut, c’est ton coach. Je t’annonce les repos, les séries et les minuteurs, même écran verrouillé.' };
+/* noms d'exercices écrits comme ils se prononcent (anglicismes) */
+const VX_SAY = {"legcurl":"Lègue keurle allongé","legext":"Lègue extension","hipthrust":"Hipe treusste","mollet_assis":"Mollets assis, à la machine","decline_db":"Développé décliné, aux haltères","incline_db":"Développé incliné, aux haltères","dips":"Dipse","tri_corde":"Extension triceps à la poulie haute, avec la corde","tri_haute":"Extension triceps à la poulie haute","arr_db":"Arrière d'épaules aux haltères, buste penché","tirage_h_uni":"Tirage horizontal unilatéral, prise neutre","tirage_h_semi":"Tirage horizontal à la poulie, prise semi-large","tirage_v":"Tirage vertical à la poulie, prise semi-large","pullover":"Pull-over à la poulie haute","curl_pupitre":"Keurle pupitre à la machine","curl_marteau":"Keurle marteau","arr_poulie":"Arrière d'épaules à la poulie haute","elev_front":"Élévations frontales à la poulie, avec la corde","elev_lat":"Élévations latérales à la poulie, à mi-hauteur","crunch":"Creunche à la poulie haute","crunch_obl":"Creunche oblique à la poulie haute, un bras","woodchop":"Woude-tchope à la poulie","releve":"Relevé de genoux, à la chaise romaine","z2":"Cardio, zone deux","planche":"Planche, gainage ventral","birddog":"Beurde dogue","deadbug":"Dède beugue","hiit":"Fractionné, trente secondes, soixante secondes","mobilite":"Mobilité des hanches et des épaules","dc_halteres":"Développé couché, aux haltères","ecarte_poulie":"Écarté à la poulie, vis-à-vis","ecarte":"Écarté machine, assis","rowing_appui":"Rôwingue à la machine, poitrine en appui","rowing_uni":"Rôwingue unilatéral à l'haltère, en appui sur le banc","pulldown_bt":"Poule-daoune, bras tendus","face_pull":"Fèsse poule","elev_lat_db":"Élévations latérales aux haltères, assis","elev_lat_machine":"Élévations latérales à la machine","oiseau_machine":"Oiseau à la machine","curl_incline":"Keurle incliné aux haltères","curl_poulie":"Keurle à la poulie basse","curl_concentre":"Keurle concentré, assis","barre_front":"Barre au front, allongé","tri_nuque":"Extension triceps nuque, à la poulie, avec la corde","tri_uni":"Extension triceps unilatérale, à la poulie","legcurl_assis":"Lègue keurle assis","kickback":"Kik-bak fessier, à la poulie","abducteurs":"Abducteurs, à la machine","adducteurs":"Adducteurs, à la machine","crunch_machine":"Creunche à la machine","pallof":"Palof presse","stepper":"Stèpeur"};
+function vxDur(s) { const m = Math.floor(s / 60), r = s % 60; if (!m) return r + ' secondes'; return (m === 1 ? 'Une minute' : m + ' minutes') + (r ? ' ' + r : ''); }
+function vxText(k) {
+  if (!k) return '';
+  if (k.charAt(0) === '!') return k.slice(1);
+  if (VX_FIX[k]) return VX_FIX[k];
+  let m;
+  if ((m = /^rest_(\d+)$/.exec(k))) return vxDur(+m[1]) + ' de repos.';
+  if ((m = /^set_(\d+)$/.exec(k))) return 'Série ' + m[1] + '.';
+  if ((m = /^obj_(\d+)$/.exec(k))) return 'Objectif : ' + m[1] + (m[1] === '1' ? ' répétition.' : ' répétitions.');
+  if ((m = /^hold_(\d+)$/.exec(k))) return 'Tiens ' + m[1] + ' secondes.';
+  if ((m = /^round_(\d+)$/.exec(k))) return 'Tour ' + m[1] + '.';
+  if ((m = /^min_(\d+)$/.exec(k))) return m[1] + ' minutes.';
+  if ((m = /^ex_(.+)$/.exec(k))) { const e = EXI[m[1]]; return e ? (VX_SAY[m[1]] || e.n.replace(/\s*\(/g, ', ').replace(/\)/g, '')) + '.' : ''; }
+  return '';
+}
 function vxPlay(blob, kind, meta) {
   if (!vxOn() || !VX.idx) return false;
   const el = vxEl();
@@ -3966,8 +3991,8 @@ function vxPlay(blob, kind, meta) {
 }
 function vxStop(kind) {
   if (kind && VX.kind !== kind) return;
-  if (VX.kind) natAudio(false);
-  VX.kind = '';
+  if (VX.kind) { natAudio(false); natVoiceStop(); }
+  VX.kind = ''; VX.until = 0;
   if (VX.el) { try { VX.el.pause(); } catch (e) { /* ignore */ } }
   try { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none'; } catch (e) { /* ignore */ }
 }
@@ -3985,8 +4010,10 @@ function vxMeta(m) {
 }
 function vxSay(keys, title) {
   if (!vxOn()) return;
-  if (!VX.idx) { vxLoad(); return; }
+  const nat = natVoiceOn();
+  if (!nat && !VX.idx) { vxLoad(); return; }
   if (vxActive() && VX.kind !== 'say') return; // ne coupe pas un minuteur en cours
+  if (nat) { natPlan([{ t: 0, k: keys }], 6, 'say', { title: title || 'My Coach' }); return; }
   vxPlay(vxTrack([{ t: 0.1, k: keys }], 0), 'say', { title: title || 'My Coach', dur: 12 });
 }
 function vxCheer() { VX.cheer = (VX.cheer + 1) % 3; return 'enc' + (VX.cheer + 1); }
@@ -3995,13 +4022,14 @@ function vxCheer() { VX.cheer = (VX.cheer + 1) % 3; return 'enc' + (VX.cheer + 1
 /* vi : { pr, album, next: { kind: 'set' | 'ex', n, last, id, reps, sec } } */
 function vxRest(sec, vi, resumed) {
   if (!vxOn()) return;
-  if (!VX.idx) { vxLoad(); return; }
+  const nat = natVoiceOn(), has = k => nat || vxHas(k);
+  if (!nat && !VX.idx) { vxLoad(); return; }
   sec = Math.max(1, Math.round(sec));
   const cues = [];
   if (!resumed) {
     const k0 = [];
     if (vi && vi.pr) k0.push('pr');
-    k0.push(vxHas('rest_' + sec) ? 'rest_' + sec : 'rest');
+    k0.push(has('rest_' + sec) ? 'rest_' + sec : 'rest');
     cues.push({ t: 0.1, k: k0 });
   }
   if (sec >= 40) cues.push({ t: sec - 10, k: 't10', opt: 1 });
@@ -4009,24 +4037,27 @@ function vxRest(sec, vi, resumed) {
   const end = ['beepL', 'go'];
   const nx = vi && vi.next;
   if (nx) {
-    if (nx.kind === 'ex') { end.push('next_ex'); if (S.settings.voiceNames && vxHas('ex_' + nx.id)) end.push('ex_' + nx.id); }
-    else if (nx.kind === 'set') end.push(nx.last ? 'set_last' : (vxHas('set_' + nx.n) ? 'set_' + nx.n : null));
+    if (nx.kind === 'ex') { end.push('next_ex'); if (S.settings.voiceNames && has('ex_' + nx.id)) end.push('ex_' + nx.id); }
+    else if (nx.kind === 'set') end.push(nx.last ? 'set_last' : (has('set_' + nx.n) ? 'set_' + nx.n : null));
     if (S.settings.voiceNames) {
-      if (nx.sec) end.push(vxHas('hold_' + nx.sec) ? 'hold_' + nx.sec : null);
+      if (nx.sec) end.push(has('hold_' + nx.sec) ? 'hold_' + nx.sec : null);
       else if (nx.reps === 'max') end.push('max');
+      else if (nat && nx.reps) end.push('!Objectif : ' + nx.reps + ' répétitions' + (nx.w > 0 ? ' à ' + String(nx.w).replace('.', ',') + ' kilos' : '') + '.');
       else if (nx.reps && vxHas('obj_' + nx.reps)) end.push('obj_' + nx.reps);
     }
   }
   cues.push({ t: sec, k: end });
+  if (nat) { natPlan(cues, sec + 5, 'rest', { title: 'Repos · ' + clock(sec) }); return; }
   vxPlay(vxTrack(cues, sec + 5), 'rest', { title: 'Repos · ' + clock(sec), album: (vi && vi.album) || 'Séance', dur: sec + 6 });
 }
 
 /* ---------- minuteur : fractionné, gainage, tabata, zone 2 ---------- */
 function vxTimer() {
   if (!vxOn()) return;
-  if (!VX.idx) { vxLoad(); return; }
+  const nat = natVoiceOn();
+  if (!nat && !VX.idx) { vxLoad(); return; }
   if (TM.phase === 'idle' || TM.phase === 'done' || TM.paused) { vxStop('timer'); return; }
-  const hold = TM.id === 'hold', cheer = !!S.settings.voiceCheer;
+  const hold = TM.id === 'hold', cheer = !!S.settings.voiceCheer, vxHas = k => nat || !!(VX.idx && VX.idx.c[k]);
   const segs = [];
   let ph = TM.phase, round = TM.round, end = Math.max(0, (TM.end - Date.now()) / 1000), guard = 0;
   segs.push({ ph: ph, round: round, s: end - phaseDur(), e: end });
@@ -4062,6 +4093,7 @@ function vxTimer() {
   });
   const total = Math.max(0, segs[segs.length - 1].e) + 4;
   VX.endAt = Date.now() + (total - 4) * 1000;
+  if (nat) { natPlan(cues, total, 'timer', { title: TM.name }); return; }
   vxPlay(vxTrack(cues, total), 'timer', { title: TM.name + (TM.k > 1 ? ' · ' + TM.k + ' tours' : ' · ' + clock(TM.w)), album: 'Minuteur', dur: total });
 }
 
@@ -4077,6 +4109,40 @@ function natHealthStatus() { if (!NATIVE) return null; try { return JSON.parse(M
 function natShareFile(name, mime, b64, title) { try { MCNative.shareFile(name, mime, b64, title || name); return true; } catch (e) { return false; } }
 function natOpenFile(name, mime, b64) { try { MCNative.openFile(name, mime, b64); return true; } catch (e) { return false; } }
 function natShareText(text, title) { try { MCNative.shareText(text, title || ''); return true; } catch (e) { return false; } }
+/* voix naturelle : synthèse vocale d'Android (Google ou Samsung) */
+function natVoiceOn() { if (!NATIVE || !S.settings.voice) return false; try { return !!MCNative.ttsOk(); } catch (e) { return false; } }
+function natSay(text) { try { MCNative.ttsSay(String(text || '')); } catch (e) { /* ignore */ } }
+function natVoiceStop() { if (NATIVE) try { MCNative.voiceStop(); } catch (e) { /* ignore */ } }
+function natPlan(cues, total, kind, meta) {
+  const items = []; let busy = 0;
+  cues.slice().sort((a, b) => a.t - b.t).forEach(c => {
+    let b = 0; const txt = [];
+    (Array.isArray(c.k) ? c.k : [c.k]).filter(Boolean).forEach(k => { if (k === 'beep') b = Math.max(b, 1); else if (k === 'beepL') b = 2; else { const s = vxText(k); if (s) txt.push(s); } });
+    const s = txt.join(' '), t = Math.max(0, c.t);
+    if (!s && !b) return;
+    if (c.opt && t < busy - 0.15) return;
+    busy = Math.max(busy, t) + (b ? 0.45 : 0) + s.length / 14;
+    // la synthèse met un instant à démarrer : le décompte part un peu en avance
+    items.push({ t: Math.round(Math.max(0, b ? t : t - 0.2) * 100) / 100, s: s, b: b });
+  });
+  try { MCNative.voicePlan(JSON.stringify(items)); } catch (e) { return false; }
+  VX.kind = kind; VX.until = Date.now() + (total + 1) * 1000;
+  natAudio(true, meta.title, total);
+  return true;
+}
+function natVoices() { if (!NATIVE) return null; try { return JSON.parse(MCNative.ttsVoices()); } catch (e) { return null; } }
+function natVoiceLabel(v, i) { return (v.g === 'm' ? 'Voix d’homme' : v.g === 'f' ? 'Voix de femme' : 'Voix') + ' ' + (i + 1); }
+function natEngine() { try { const d = JSON.parse(MCNative.ttsEngines()), e = (d.engines || []).find(x => x.name === d.cur); return e ? e.label : ''; } catch (e) { return ''; } }
+function voiceSheetHTML() {
+  const d = natVoices();
+  let h = shHead('Voix du coach') + '<div class="sh-body">';
+  if (!d || !d.voices || !d.voices.length) return h + emptyState('speaker', 'Aucune voix française', d && !d.ready ? 'La synthèse vocale démarre, réessaie dans un instant.' : d && d.french ? 'Ton moteur parle français, mais ne liste pas ses voix : la voix par défaut sera utilisée.' : 'Installe une voix française dans les réglages de synthèse vocale d’Android.', '<button class="btn btn-p" data-act="ttsSettings">Ouvrir les réglages</button>') + '</div>';
+  h += '<div class="foot" style="padding-top:0">Touche une voix pour l’écouter et la choisir. Les voix « en ligne » sont souvent encore plus naturelles, mais demandent une connexion.</div>';
+  h += '<div class="list ic">' + d.voices.map((v, i) => '<div class="row tap" data-act="voiceSel" data-n="' + esc(v.name) + '"><span class="tile" style="--c:' + (v.cur ? '#30D158' : '#5E5CE6') + '">' + ic(v.cur ? 'check' : 'speaker') + '</span><div class="rt"><div class="t1">' + natVoiceLabel(v, i) + '</div><div class="t2">' + (v.net ? 'En ligne' : 'Hors ligne') + (v.q >= 500 ? ' · très naturelle' : '') + (v.country && v.country !== 'FR' ? ' · ' + esc(v.country) : '') + ' · ' + esc(v.name) + '</div></div></div>').join('') + '</div>';
+  h += '<div class="list ic">' + row('sliders', '#8E8E93', 'Moteur vocal', esc(natEngine() || 'Google, Samsung…'), 'enginePick') + row('down', '#0A84FF', 'Installer d’autres voix', 'Réglages de synthèse vocale d’Android', 'ttsSettings') + '</div>';
+  return h + '</div>';
+}
+window.mcVoices = function () { softRerender('settings'); softRerender('voice'); };
 function natHealthRead(manual) { if (!NATIVE) return; if (manual) NAT_WAIT = true; NAT_HT = Date.now(); try { MCNative.healthRead(); } catch (e) { /* ignore */ } }
 /* jeton de la sauvegarde cloud : partagé avec la synchro Samsung Health en arrière-plan */
 function natCloud() { if (NATIVE && CLOUD.token) try { MCNative.cloudSet(CLOUD.token, CLOUD.owner + '/' + CLOUD.repo); } catch (e) { /* ignore */ } }
@@ -4307,7 +4373,8 @@ const ACT = {
     const k = t.dataset.k; S.settings[k] = !S.settings[k]; save(); haptic(); rerenderSheet('settings'); refresh();
     if (k === 'sound' && S.settings.sound) sound('tick');
     if (k === 'notifs') natReminders();
-    if (k === 'voice') { if (S.settings.voice) { vxUnlock(); vxLoad().then(ok => { if (ok) vxSay(['voice_test'], 'Voix du coach'); rerenderSheet('settings'); }); } else vxStop(); }
+    if (k === 'voice' && natVoiceOn()) { natSay('C’est ton coach. Je suis là.'); }
+    else if (k === 'voice') { if (S.settings.voice) { vxUnlock(); vxLoad().then(ok => { if (ok) vxSay(['voice_test'], 'Voix du coach'); rerenderSheet('settings'); }); } else vxStop(); }
   },
   waterGoal: t => { S.settings.waterGoal = clamp(S.settings.waterGoal + (+t.dataset.d), 4, 20); save(); haptic(); rerenderSheet('settings'); refresh(); },
   ics: () => exportICS(),
@@ -4351,7 +4418,11 @@ const ACT = {
   santeRefresh: () => { if (NATIVE) { toast('Lecture de Samsung Health…', 'repeat', 'var(--blue)'); natHealthRead(true); return; } toast('Actualisation…', 'repeat', 'var(--blue)'); healthFetch(true).then(ch => { toast(ch ? 'Données Samsung Health à jour' : HEALTH ? 'Rien de nouveau pour l’instant' : 'Aucune donnée : ouvre l’appli My Coach Santé', ch ? 'check' : 'info', ch ? 'var(--green)' : 'var(--orange)'); softRerender('settings'); }); },
   sleepSheet: () => openSheet({ id: 'sleep', cls: 'full', render: sleepSheetHTML }),
   /* voix */
-  voiceTest: () => { vxUnlock(); vxLoad().then(ok => { if (ok) { vxStop(); vxSay(['voice_test'], 'Voix du coach'); } else toast('Voix indisponible : ouvre l’app une fois avec internet', 'info', 'var(--orange)'); rerenderSheet('settings'); }); }
+  voicePick: () => openSheet({ id: 'voice', cls: 'full', render: voiceSheetHTML }),
+  voiceSel: t => { try { MCNative.ttsSetVoice(t.dataset.n); } catch (e) { /* ignore */ } haptic(); setTimeout(() => { natSay('Salut, c’est ton coach. On s’y met ?'); rerenderSheet('voice'); softRerender('settings'); }, 350); },
+  enginePick: () => { let d = null; try { d = JSON.parse(MCNative.ttsEngines()); } catch (e) { d = null; } if (!d || !d.engines || !d.engines.length) { toast('Aucun autre moteur installé', 'info', 'var(--orange)'); return; } actionSheet('Moteur de synthèse vocale', d.engines.map(e => ({ t: e.label + (e.name === d.cur ? '  ✓' : ''), fn: () => { try { MCNative.ttsSetEngine(e.name); } catch (x) { /* ignore */ } toast('Moteur : ' + e.label, 'speaker', 'var(--blue)'); setTimeout(() => rerenderSheet('voice'), 1500); } }))); },
+  ttsSettings: () => { try { MCNative.ttsSettings(); } catch (e) { /* ignore */ } },
+  voiceTest: () => { if (natVoiceOn()) { natSay(vxText('voice_test')); return; } vxUnlock(); vxLoad().then(ok => { if (ok) { vxStop(); vxSay(['voice_test'], 'Voix du coach'); } else toast('Voix indisponible : ouvre l’app une fois avec internet', 'info', 'var(--orange)'); rerenderSheet('settings'); }); }
 };
 
 /* ---------- délégation des événements ---------- */

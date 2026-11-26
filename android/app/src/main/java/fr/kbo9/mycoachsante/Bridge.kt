@@ -94,4 +94,44 @@ class Bridge(private val a: MainActivity) {
     fun audio(on: Boolean, title: String, seconds: Double) {
         a.runOnUiThread { a.audio(on, title, seconds.toLong()) }
     }
+
+    /* ---------- voix naturelle (synthèse vocale d'Android) ---------- */
+    @JavascriptInterface
+    fun ttsOk(): Boolean = Coach.ok()
+
+    @JavascriptInterface
+    fun ttsVoices(): String = Coach.voicesJson()
+
+    @JavascriptInterface
+    fun ttsEngines(): String = Coach.enginesJson()
+
+    @JavascriptInterface
+    fun ttsSetVoice(name: String) {
+        a.runOnUiThread { Coach.setVoice(name) }
+    }
+
+    @JavascriptInterface
+    fun ttsSetEngine(pkg: String) {
+        a.runOnUiThread { Coach.setEngine(pkg) }
+    }
+
+    @JavascriptInterface
+    fun ttsSay(text: String) {
+        a.runOnUiThread { Coach.say(text, true) }
+    }
+
+    @JavascriptInterface
+    fun voicePlan(json: String) {
+        a.runOnUiThread { Coach.plan(json) }
+    }
+
+    @JavascriptInterface
+    fun voiceStop() {
+        a.runOnUiThread { Coach.cancel() }
+    }
+
+    @JavascriptInterface
+    fun ttsSettings() {
+        a.runOnUiThread { a.openTtsSettings() }
+    }
 }
