@@ -707,7 +707,21 @@ a.row{color:inherit}
 .slb .bw i{position:absolute;left:0;right:0;bottom:0;border-radius:6px 6px 3px 3px;transform-origin:bottom;animation:growY .8s var(--soft) both}
 @keyframes growY{from{transform:scaleY(0)}to{transform:scaleY(1)}}
 .slb .c span{font-size:11px;font-weight:600;color:var(--t3);height:16px;line-height:16px}
-.slb .goal{position:absolute;left:0;right:0;bottom:calc(21px + (100% - 27px) * .7);border-top:1.5px dashed rgba(125,122,255,.75);pointer-events:none}
+.slb .goal{position:absolute;left:0;right:0;bottom:calc(21px + (100% - 27px) * var(--g,.7));border-top:1.5px dashed var(--gc,rgba(125,122,255,.75));pointer-events:none}
+.slb.wk .c span{font-size:10px;letter-spacing:-.02em}
+.nd{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:2px}
+.nd .k{font-size:13px;color:var(--t2);font-weight:600}
+.nd .big{font-size:26px}
+.nd small{font-size:13px;color:var(--t2);font-weight:600}
+.nchk{display:flex;flex-direction:column;gap:11px;margin-top:14px;padding-top:13px;border-top:.5px solid var(--sep)}
+.nc{display:flex;gap:10px;align-items:flex-start}
+.nc>span{width:22px;height:22px;flex:none;display:grid;place-items:center}
+.nc>span svg{width:18px;height:18px}
+.nc b{display:block;font-size:15px;font-weight:600;letter-spacing:-.01em}
+.nc small{display:block;font-size:13px;color:var(--t2);margin-top:2px;line-height:1.35}
+.cr-t{font-size:15px;line-height:1.42;color:var(--t1)}
+.cr-b{display:flex;gap:10px;margin-top:13px}
+.cr-b .btn{flex:1}
 /* feuilles par-dessus l'écran de bienvenue */
 .ob ~ .layer{z-index:850}
 body:has(#ob) .toast{z-index:900}
@@ -1194,10 +1208,10 @@ function defaults() {
   const t = dkey();
   return {
     v: 3, onboarded: false,
-    profile: { name: '', height: 175, startWeight: 90, goal: 80, startDate: t, weeks: 12 },
-    settings: { mode: 'fixed', trainTime: 'soir', bedtime: '23:30', restAuto: true, sound: true, haptics: true, keepAwake: true, theme: 'auto', optSupps: false, waterGoal: 10, glass: 250, remindTrain: '18:00', remindWeigh: '07:30', voice: true, voiceNames: true, voiceCheer: true, voiceMix: false, notifs: true },
+    profile: { name: '', height: 175, startWeight: 90, goal: 80, startDate: t, weeks: 12, birth: '', sex: 'm' },
+    settings: { mode: 'fixed', trainTime: 'soir', bedtime: '23:30', restAuto: true, sound: true, haptics: true, keepAwake: true, theme: 'auto', optSupps: false, waterGoal: 10, glass: 250, remindTrain: '18:00', remindWeigh: '07:30', voice: true, voiceNames: true, voiceCheer: true, voiceMix: false, notifs: true, stepGoal: 8000 },
     weights: [], measures: [], days: {}, sessions: [], active: null, awards: {}, cheats: [], shop: {}, fastLog: [], rot: 0,
-    prog: {}, customEx: {}, savedAt: 0
+    prog: {}, customEx: {}, steps: {}, coach: { adj: 0, log: [], snooze: '' }, savedAt: 0
   };
 }
 function migrateOld(s) {
@@ -1225,7 +1239,7 @@ function load() {
   return s;
 }
 let S = load();
-registerCustom(); applyProgram();
+registerCustom(); applyProgram(); applyDietAdj();
 let saveT = null, SAVE_PENDING = false;
 /* enregistrement automatique : chaque action est écrite sur le téléphone (+ copie de secours et cloud, voir SAUVEGARDE) */
 function save(now) {
@@ -1297,7 +1311,7 @@ function suppsCore(k) { const r = day(k); return CORE_SUPPS.filter(id => r.sp[id
 /* habitudes */
 const HABITS = [
   { id: 'water', n: 'Eau', c: '#64D2FF', ic: 'drop' },
-  { id: 'steps', n: '8 000 pas', c: '#30D158', ic: 'walk' },
+  { id: 'steps', get n() { return num(stepGoal()) + ' pas'; }, c: '#30D158', ic: 'walk' },
   { id: 'sleep', n: 'Sommeil 7' + NB + 'h+', c: '#5E5CE6', ic: 'moon' },
   { id: 'supps', n: 'Compléments', c: '#BF5AF2', ic: 'pill' },
   { id: 'cann', n: 'Cannelle', c: '#FF9F0A', ic: 'leaf' },
@@ -1311,9 +1325,10 @@ function habitVal(k, id) {
   if (r.h[id]) return 1;
   /* Samsung Health (appli My Coach Santé) : sommeil et pas remplis automatiquement */
   if (id === 'sleep' && typeof sleepOn === 'function') { const n = sleepOn(k); if (n) return clamp(n.min / 420, 0, 1); }
-  if (id === 'steps' && typeof stepsOn === 'function') { const n = stepsOn(k); if (n != null) return clamp(n / 8000, 0, 1); }
+  if (id === 'steps' && typeof stepsOn === 'function') { const n = stepsOn(k); if (n != null) return clamp(n / stepGoal(), 0, 1); }
   return 0;
 }
+function stepGoal() { return (S.settings && S.settings.stepGoal) || 8000; }
 function habitsScore(k) { return HABITS.reduce((a, h) => a + habitVal(k, h.id), 0); }
 
 /* anneaux du jour : séance · protéines · habitudes */
@@ -1391,7 +1406,7 @@ function exHistory(id, excludeActive) {
     if (!ws.length) return;
     let best = null, vol = 0, top = 0, maxR = 0;
     ws.forEach(x => { const v = e1rm(x.w, x.r); vol += (x.w || 0) * x.r; if ((x.w || 0) > top) top = x.w || 0; if (x.r > maxR) maxR = x.r; if (!best || v > best.e1 || (v === best.e1 && x.r > best.r)) best = { w: x.w || 0, r: x.r, e1: v }; });
-    out.push({ date: s.date, end: s.end || 0, sets: ws, best: best, top: top, vol: vol, maxR: maxR, sid: s.id });
+    out.push({ date: s.date, end: s.end || 0, sets: ws, best: best, top: top, vol: vol, maxR: maxR, sid: s.id, dl: !!e.dl });
   });
   return out.sort((a, b) => a.end - b.end);
 }
@@ -1411,6 +1426,8 @@ function suggest(ex, i, last) {
   if (ex.mode === 'min') return { w: null, r: p ? p.r : base };
   if (ex.mode === 'sec') return { w: null, r: p ? Math.min(p.r + 5, Math.max(60, p.r)) : base };
   if (!p) return { w: null, r: base === 'max' ? null : base };
+  const pl = plateau(ex); // 3 séances sans progrès : séance allégée
+  if (pl) return { w: pl.w, r: base === 'max' ? p.r : base, dl: true };
   if (base === 'max') return { w: p.w || 0, r: p.r + 1 };
   const top = topOf(base);
   if (ex.load === 'pdc') return { w: 0, r: Math.min(p.r + 1, top) };
@@ -1421,6 +1438,7 @@ function coachGoal(ex, last) {
   if (ex.mode === 'min') return last ? { k: 'aim', t: 'Dernière fois : ' + last.sets[0].r + NB + 'min. Garde la même régularité.' } : null;
   if (ex.mode === 'sec') return { k: 'aim', t: last ? 'Dernière fois : ' + last.sets.map(x => x.r + NB + 's').join(' · ') + '. Objectif : +5 s par série (jusqu’à 60 s).' : 'Tiens chaque série en gardant une posture parfaite. Utilise le chrono intégré.' };
   if (!last) return { k: 'first', t: 'Première fois : trouve ton poids de travail avec les paliers, ' + (ex.s[0].r === 'max' ? 'puis fais le maximum de reps propres.' : 'la dernière rep de chaque série doit être la dernière possible.') };
+  { const pl = plateau(ex); if (pl) return { k: 'dl', t: '3 séances sans progrès : séance allégée aujourd’hui, à ' + kg(pl.w) + NB + 'kg (environ −10 %). Mouvements propres, sans aller à l’échec : tu repartiras plus fort la fois suivante.' }; }
   if (ex.s[0].r === 'max') { const p = prevSet(last, 0); return { k: 'aim', t: 'Dernière fois ' + last.sets.map(x => x.r).join(' · ') + ' reps. Objectif : +1 rep par série.' }; }
   const allTop = ex.s.every((t, i) => { const p = prevSet(last, i); return p && p.r >= topOf(t.r); });
   const p0 = prevSet(last, 0);
@@ -1948,7 +1966,7 @@ function vToday() {
   h += heroCard(k) + weekStrip();
   h += '<div class="grid2">' + fastTile() + weightTile() + '</div>';
   h += '<div class="card"><div class="ch">' + ic('sparkle') + 'Habitudes du jour<span class="r">' + hDone + ' sur ' + HABITS.length + '</span></div><div class="hab">' + HABITS.map(habBtn).join('') + '</div></div>';
-  h += santeCard() + streakCard() + tipCard();
+  h += reviewCard('today') + santeCard() + streakCard() + tipCard();
   return h;
 }
 function heroCard(k) {
@@ -2024,7 +2042,7 @@ function santeCard() {
   const dAt = dkey(new Date(HEALTH.at)), when = dAt === t ? hhmm(HEALTH.at) : relDay(dAt);
   let h = '<div class="card sante tap" data-act="sleepSheet"><div class="ch">' + ic('moon') + '<span style="color:#7D7AFF">Sommeil et pas</span><span class="r">' + when + ic('chev') + '</span></div>';
   h += '<div class="sa-row"><div><div class="k">' + (tonight ? 'Cette nuit' : 'Dernière nuit') + '</div><div class="big" style="color:#7D7AFF">' + (n ? hmin(n.min) : '—') + '</div><div class="tiny">' + (n ? hhmm(n.s) + ' → ' + hhmm(n.e) : 'Pas encore de nuit') + '</div></div>' +
-    '<div><div class="k">Pas aujourd’hui</div><div class="big" style="color:#30D158">' + (steps != null ? num(steps) : '—') + '</div><div class="bar" style="--c:#30D158;margin-top:7px"><i style="' + barW('steps', (steps || 0) / 8000) + '"></i></div></div></div>';
+    '<div data-act="stepsSheet"><div class="k">Pas aujourd’hui</div><div class="big" style="color:#30D158">' + (steps != null ? num(steps) : '—') + '</div><div class="bar" style="--c:#30D158;margin-top:7px"><i style="' + barW('steps', (steps || 0) / stepGoal()) + '"></i></div></div></div>';
   if (n && n.st) h += stageBar(n);
   if (a7) h += '<div class="tiny" style="margin-top:10px">Moyenne sur 7 nuits : <b style="color:var(--t1)">' + hmin(a7) + '</b> · objectif 7 h</div>';
   return h + '</div>';
@@ -2087,6 +2105,7 @@ function vFood() {
   let h = lt(DIET.name + ' · ' + num(DIET.kcal) + NB + 'kcal', 'Nutrition', avatarBtn());
   h += '<div class="card"><div class="macro"><div class="kring">' + arcSVG({ size: 124, sw: 12, v: clamp(e.kcal / DIET.kcal, 0, 1), key: 'kcal', track: 'rgba(255,159,10,.17)', grad: ['#FF9F0A', '#FF375F'] }) + '<div class="c"><b>' + num(e.kcal, 0) + '</b><span>sur ' + num(DIET.kcal, 0) + ' kcal</span></div></div><div class="mbars">' +
     mbar('Protéines', e.p, DIET.p, '#FF375F', 'mp') + mbar('Glucides', e.g, DIET.g, '#30D158', 'mg') + mbar('Lipides', e.l, DIET.l, '#FFD60A', 'ml') + '</div></div></div>';
+  h += reviewCard('food');
   h += fastCard();
   const tt = todayTT(k), p = planFor(k);
   h += '<div class="sec"><h2>Repas du jour</h2><span class="sub">Je m’entraîne…</span></div>';
@@ -2095,7 +2114,7 @@ function vFood() {
     if (it.tr) return '<div class="tli train"><span class="dot"></span><div class="trn">' + ic('dumbbell') + '<div>Entraînement · ' + it.t.toLowerCase() + '<small>' + (isTrain(p) ? p.name : 'Séance du jour') + '</small></div></div></div>';
     return mealCard(k, MEALS.find(m => m.id === it.m), it.t);
   }).join('') + '</div>';
-  h += waterCard(k) + suppCard(k) + cheatCard();
+  h += waterCard(k) + suppCard(k) + cheatCard() + needsCard();
   h += '<div class="list ic">' + row('cart', '#30D158', 'Liste de courses', 'Pour préparer 2 à 3 jours de repas', 'shop') + '</div>';
   h += '<div class="sec"><h2>Règles du coach</h2></div><div class="list ic rules">' + RULES.map(r => '<div class="row"><span class="tile" style="--c:' + r.c + '">' + ic(r.ic) + '</span><div class="rt"><div class="t1">' + r.t + '</div><div class="t2">' + r.s + '</div></div></div>').join('') + '</div>';
   return h;
@@ -2158,8 +2177,8 @@ function cheatCard() {
 /* ---------------- PROGRÈS ---------------- */
 function vProg() {
   let h = lt('Objectif ' + num(S.profile.goal) + NB + 'kg', 'Progrès', avatarBtn());
-  h += seg('prog', [['poids', 'Poids'], ['force', 'Force'], ['reg', 'Régularité']], PROG_SEG);
-  if (PROG_SEG === 'poids') h += progWeight(); else if (PROG_SEG === 'force') h += progForce(); else h += progReg();
+  h += seg('prog', [['poids', 'Poids'], ['force', 'Force'], ['pas', 'Pas'], ['reg', 'Régularité']], PROG_SEG);
+  if (PROG_SEG === 'poids') h += progWeight(); else if (PROG_SEG === 'force') h += progForce(); else if (PROG_SEG === 'pas') h += stepsBody(); else h += progReg();
   return h;
 }
 function progWeight() {
@@ -2186,7 +2205,7 @@ function progWeight() {
     kpi('Rythme', rateTxt, '', ws.T.length < 3 ? 'Dès 3 pesées · conseillé 0,5 à 1 % du poids par semaine' : (Math.abs(pctW) > 1.1 && pw < 0 ? 'Rapide : garde tes protéines hautes' : 'Conseillé : 0,5 à 1 % du poids/sem')) +
     kpi('Objectif', ws.eta ? fmtDayC(ws.eta) : (ws.current <= ws.goal ? 'Atteint' : '—'), '', ws.eta ? 'Au rythme actuel' : (ws.current <= ws.goal ? 'Bravo !' : 'Projection dès qu’une baisse est mesurée')) + '</div>';
   h += '<div class="card"><div class="ch">' + ic('target') + 'Vers l’objectif<span class="r">' + Math.round(ws.pct * 100) + NB + '%</span></div><div class="goalbar"><i style="' + barW('goal', ws.pct) + '"></i><b style="--w1:' + (ws.pct * 100).toFixed(1) + '%"></b></div><div class="gb-l"><span>' + num(ws.start) + NB + 'kg</span><span>' + num(ws.goal - ws.trend >= 0 ? 0 : ws.trend - ws.goal, 1) + NB + 'kg restants</span><span>' + num(ws.goal) + NB + 'kg</span></div></div>';
-  h += measuresCard();
+  h += measuresCard() + bodyCard();
   const L = ws.T.slice().reverse().slice(0, 15);
   h += '<div class="sec"><h2>Historique</h2><span class="sub">' + plural(ws.T.length, 'pesée') + '</span></div><div class="list">' + L.map((p, i) => {
     const prev = L[i + 1]; const d = prev ? p.kg - prev.kg : 0;
@@ -2196,16 +2215,17 @@ function progWeight() {
 }
 function sgn(v, dec) { if (Math.abs(v) < (dec ? .5 * Math.pow(10, -dec) : .5)) return num(0, dec); return (v < 0 ? '−' : '+') + num(Math.abs(v), dec); }
 function kpi(k, v, u, s) { return '<div class="card"><div class="k">' + k + '</div><div class="v">' + v + (u ? '<small> ' + u + '</small>' : '') + '</div><div class="s">' + s + '</div></div>'; }
-const MEAS = [['waist', 'Tour de taille'], ['chest', 'Poitrine'], ['arm', 'Bras'], ['thigh', 'Cuisse']];
+const MEAS = [['waist', 'Tour de taille'], ['neck', 'Cou'], ['hips', 'Hanches'], ['chest', 'Poitrine'], ['arm', 'Bras'], ['thigh', 'Cuisse']];
+const MEAS_UP = { chest: 1, arm: 1, thigh: 1 }; // plus = mieux (muscle) ; les autres : moins = mieux
 function measuresCard() {
-  const M = S.measures.slice().sort((a, b) => a.d < b.d ? -1 : 1);
-  const last = M[M.length - 1], first = M[0];
-  let rows = MEAS.map(m => {
-    const v = last && last[m[0]], v0 = first && first[m[0]];
-    const d = (v != null && v0 != null && M.length > 1) ? v - v0 : null;
-    return '<div class="row"><div class="rt"><div class="t1">' + m[1] + '</div></div><div class="rv">' + (v != null ? '<b class="num" style="color:var(--t1);font-weight:600">' + num(v, 1) + NB + 'cm</b>' : '—') + (d != null ? '<div class="tiny" style="color:' + (m[0] === 'arm' ? (d >= 0 ? 'var(--green)' : 'var(--orange)') : (d <= 0 ? 'var(--green)' : 'var(--orange)')) + '">' + (d <= 0 ? '−' : '+') + num(Math.abs(d), 1) + '</div>' : '') + '</div></div>';
+  const M = S.measures.slice().sort((a, b) => a.d < b.d ? -1 : 1), last = M[M.length - 1];
+  const rows = MEAS.map(m => {
+    const L = M.filter(x => x[m[0]] != null), v = L.length ? L[L.length - 1][m[0]] : null, d = L.length > 1 ? v - L[0][m[0]] : null;
+    const good = d == null ? null : (MEAS_UP[m[0]] ? d >= 0 : d <= 0);
+    return '<div class="row"><div class="rt"><div class="t1">' + m[1] + '</div></div><div class="rv">' + (v != null ? '<b class="num" style="color:var(--t1);font-weight:600">' + num(v, 1) + NB + 'cm</b>' : '—') +
+      (d != null ? '<div class="tiny" style="color:' + (good ? 'var(--green)' : MEAS_UP[m[0]] ? 'var(--t2)' : 'var(--orange)') + '">' + (Math.abs(d) < 0.05 ? 'stable' : (d < 0 ? '−' : '+') + num(Math.abs(d), 1) + NB + 'cm') + ' depuis ' + fmtDayC(L[0].d) + '</div>' : '') + '</div></div>';
   }).join('');
-  return '<div class="sec"><h2>Mensurations</h2><button class="lnk" data-act="measure">Ajouter</button></div><div class="list">' + rows + '</div><div class="foot">' + (last ? 'Dernière mesure : ' + relDay(last.d).toLowerCase() + '. ' : '') + 'Le tour de taille montre la perte de gras même quand la balance stagne.</div>';
+  return '<div class="sec"><h2>Mensurations</h2><button class="lnk" data-act="measure">Ajouter</button></div><div class="list">' + rows + '</div><div class="foot">' + (last ? 'Dernière mesure : ' + relDay(last.d).toLowerCase() + '. ' : '') + 'Le tour de taille montre la perte de gras même quand la balance stagne ; le cou sert à estimer ton % de gras.</div>';
 }
 function progForce() {
   if (!S.sessions.some(s => s.kind === 'muscu' || s.kind === 'cardio')) return emptyState('trophy', 'Aucune séance pour l’instant', 'Tes charges, tes records et ta progression exercice par exercice apparaîtront ici après ta première séance.', '<button class="btn btn-p" data-act="go" data-tab="train">Voir le programme</button>');
@@ -2273,6 +2293,7 @@ function medalCell(a, gs) {
 /* ---------------- COACH ---------------- */
 function vCoach() {
   let h = lt('La méthode de ton coach', 'Coach', avatarBtn());
+  h += '<div class="list ic">' + row('book', '#BF5AF2', 'Les bases scientifiques', 'Formules, repères et études derrière les calculs', 'science') + '</div>';
   h += cc('flame', '#FF453A', 'L’échauffement est primordial',
     '<p>Ne néglige jamais l’échauffement, même si tu manques de temps : <b>mieux vaut sauter un exo que l’échauffement.</b></p><p>' + WARM.upper.tip + '</p>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><a class="vlink" style="--c:#FF453A;--crgb:255,69,58" href="' + WARM.upper.vid + '" target="_blank" rel="noopener">' + ic('video') + 'Haut du corps</a><a class="vlink" style="--c:#FF453A;--crgb:255,69,58" href="' + WARM.lower.vid + '" target="_blank" rel="noopener">' + ic('video') + 'Bas du corps</a></div>');
@@ -2390,7 +2411,8 @@ function newActiveEx(e, open) {
     id: e.id,
     sets: e.s.map((st, j) => ({ i: j, t: st.d ? 'd' : 'n', target: st.r, w: '', r: '', done: false })),
     pal: hasPal(e) ? paliers(e, W).map(p => ({ r: p.r, w: '', rr: '', sugg: p.w, done: false })) : [],
-    palOpen: hasPal(e) && (open || !last)
+    palOpen: hasPal(e) && (open || !last),
+    dl: plateau(e) ? 1 : 0
   };
 }
 function createActive(id) {
@@ -2472,7 +2494,7 @@ function exCard(a, i) {
   let h = '<div class="xcard' + (ex.ss ? ' ss' : '') + (done ? ' alldone' : '') + '" data-ex="' + i + '">' + (ex.ss ? '<span class="ss-tag">SUPERSET</span>' : '');
   h += '<div class="xh"><div class="xi">' + (done ? ic('check') : pos) + '</div><div class="xt"><div class="xn">' + esc(ex.n) + '</div><div class="xs">' + esc(ex.eq) + ' · ' + schemeX(ex) + (ex.unit ? ' · ' + ex.unit : '') + (ae.added ? ' · <span style="color:var(--blue)">ajouté</span>' : '') + '</div></div><button class="ib" data-act="exMenu" data-i="' + i + '" aria-label="Options de l’exercice">' + ic('more') + '</button></div>';
   if (ex.note) h += '<div class="xnote">' + ic('info') + '<span>' + esc(ex.note) + '</span></div>';
-  if (goal) h += '<div class="xgoal' + (goal.k === 'up' ? ' up' : '') + '">' + ic(goal.k === 'up' ? 'arrowUp' : 'target') + '<span>' + goal.t + '</span></div>';
+  if (goal) h += '<div class="xgoal' + (goal.k === 'up' ? ' up' : '') + '">' + ic(goal.k === 'up' ? 'arrowUp' : goal.k === 'dl' ? 'later' : 'target') + '<span>' + goal.t + '</span></div>';
   if (ae.pal && ae.pal.length) {
     const sum = ae.pal.map(p => p.r + (p.sugg != null ? ' × ' + kg(p.sugg) : '')).join(' · ');
     h += '<button class="xpal' + (ae.palOpen ? ' open' : '') + '" data-act="palToggle" data-i="' + i + '">' + ic('stairs') + '<span><b>Paliers</b> · ' + sum + (ae.pal[0].sugg != null ? NB + 'kg' : ' reps') + '</span>' + ic('chev', 'chev') + '</button>';
@@ -2672,7 +2694,7 @@ function discardWorkout() { S.active = null; save(true); stopRest(); keepAwake(f
 function finishWorkout() {
   const a = S.active; if (!a) return;
   const s = SESS[a.tpl], end = Date.now();
-  const ex = a.order.map(i => { const ae = a.ex[i]; return { id: ae.id, sets: ae.sets.filter(x => x.done).map(x => ({ i: x.i, t: x.t, w: parseNum(x.w) || 0, r: parseNum(x.r) || 0 })) }; }).filter(e => e.sets.length);
+  const ex = a.order.map(i => { const ae = a.ex[i]; const o = { id: ae.id, sets: ae.sets.filter(x => x.done).map(x => ({ i: x.i, t: x.t, w: parseNum(x.w) || 0, r: parseNum(x.r) || 0 })) }; if (ae.dl) o.dl = 1; return o; }).filter(e => e.sets.length);
   const prs = [];
   ex.forEach(e => {
     const d = EXI[e.id]; if (d.mode === 'min') return;
@@ -2872,7 +2894,7 @@ function timerHTML() {
   h += '<div class="tmr"><div class="tmr-ring"><svg viewBox="0 0 300 300"><circle class="tbg" cx="150" cy="150" r="' + R + '" stroke-width="16"/><circle class="tfg" data-tm-ring cx="150" cy="150" r="' + R + '" stroke-width="16" stroke="' + c + '" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="0"/></svg>' +
     '<div class="tmr-c"><div class="tmr-ph" data-tm-ph style="color:' + c + '"></div><div class="tmr-t" data-tm-t></div><div class="tmr-r" data-tm-r></div></div></div>' +
     '<div class="tmr-ctl"><button class="tmr-sm" data-act="tmReset" aria-label="Réinitialiser">' + ic('reset') + '</button><button class="tmr-big" data-act="tmToggle" data-tm-btn aria-label="Lecture / pause"></button><button class="tmr-sm" data-act="tmSkip" aria-label="Passer la phase">' + ic('skip') + '</button></div>' +
-    '<div class="tiny" style="text-align:center;margin-top:4px">' + esc(TM.name) + ' · ' + (TM.k > 1 ? TM.k + ' tours · ' + clock(TM.w) + ' / ' + clock(TM.r) : clock(TM.w) + ' en continu') + '</div></div>';
+    '<div class="tiny" style="text-align:center;margin-top:4px">' + esc(TM.name) + ' · ' + (TM.k > 1 ? TM.k + ' tours · ' + clock(TM.w) + ' / ' + clock(TM.r) : clock(TM.w) + ' en continu') + '</div>' + (TM.id === 'z2' && hrZ2() ? '<div class="tiny" style="text-align:center;margin-top:3px;color:var(--blue)">Zone 2 : ' + hrZ2() + '</div>' : '') + '</div>';
   if (idle) {
     h += '<div class="sec"><h2 style="font-size:19px">Préréglages</h2></div><div class="presets">' + PRESETS.map(p => '<button class="pre' + (TM.id === p.id ? ' on' : '') + '" style="--c:' + p.c + '" data-act="tmPreset" data-id="' + p.id + '"><b style="color:' + p.c + '">' + p.name + '</b><span>' + p.d + '</span></button>').join('') + '</div>';
     h += '<div class="sec"><h2 style="font-size:19px">Personnaliser</h2></div><div class="list">' +
@@ -3024,7 +3046,7 @@ function weightRowMenu(d) {
 function openMeasure() {
   const last = S.measures.slice().sort((a, b) => a.d < b.d ? -1 : 1).pop() || {};
   openSheet({ id: 'measure', cls: 'float', html: shHead('Mensurations', null, '<button class="ib p" data-act="measureSave" aria-label="Enregistrer">' + ic('check') + '</button>') +
-    '<div class="sh-body"><div class="foot" style="padding-top:0">Mesure au même endroit à chaque fois, muscle relâché, le matin. Le tour de taille se prend au niveau du nombril.</div><div class="list">' +
+    '<div class="sh-body"><div class="foot" style="padding-top:0">Le matin à jeun, mètre bien à plat, sans serrer. Taille : au nombril, ventre relâché. Cou : juste sous la pomme d’Adam. Hanches : au plus large des fesses. Bras et cuisse : au plus large, muscle relâché.</div><div class="list">' +
     MEAS.map(m => '<label class="row"><div class="rt"><div class="t1">' + m[1] + '</div></div><input class="fin" type="text" inputmode="decimal" data-meas="' + m[0] + '" placeholder="' + (last[m[0]] != null ? num(last[m[0]], 1) : '—') + '"><span class="muted">cm</span></label>').join('') +
     '</div><div style="padding:6px 16px 0"><button class="btn btn-p btn-b" data-act="measureSave">Enregistrer</button></div></div>' });
 }
@@ -3050,7 +3072,7 @@ function settingsHTML() {
   const P = S.profile, T = S.settings;
   let h = shHead('Réglages', null, '<button class="ib p" data-act="closeSheet" aria-label="Terminé">' + ic('check') + '</button>') + '<div class="sh-body">';
   h += '<div style="display:flex;flex-direction:column;align-items:center;padding:4px 20px 18px"><div class="avatar" style="width:78px;height:78px;font-size:32px">' + (P.name ? esc(P.name.charAt(0).toUpperCase()) : '<span style="font-size:38px;display:grid">' + ic('person') + '</span>') + '</div><div style="font-size:22px;font-weight:700;letter-spacing:-.025em;margin-top:10px">' + (P.name ? esc(P.name) : 'Ton profil') + '</div><div class="tiny" style="margin-top:2px">' + (weekNo() > 0 ? 'Semaine ' + weekNo() + ' · ' : '') + 'objectif ' + num(P.goal) + NB + 'kg</div></div>';
-  h += '<div class="lhd">Profil</div><div class="list">' + fieldRow('Prénom', 'text', 'profile.name', P.name, 'Facultatif') + fieldRow('Taille', 'num', 'profile.height', P.height, 'cm') + fieldRow('Poids de départ', 'num', 'profile.startWeight', P.startWeight, 'kg') + fieldRow('Poids visé', 'num', 'profile.goal', P.goal, 'kg') + '</div>';
+  h += '<div class="lhd">Profil</div><div class="list">' + fieldRow('Prénom', 'text', 'profile.name', P.name, 'Facultatif') + fieldRow('Taille', 'num', 'profile.height', P.height, 'cm') + fieldRow('Date de naissance', 'date', 'profile.birth', P.birth) + fieldRow('Poids de départ', 'num', 'profile.startWeight', P.startWeight, 'kg') + fieldRow('Poids visé', 'num', 'profile.goal', P.goal, 'kg') + '</div>' + seg('sex', [['m', 'Homme'], ['f', 'Femme']], P.sex === 'f' ? 'f' : 'm') + '<div class="foot" style="margin-top:-4px">Âge et sexe servent à calculer ta dépense d’énergie et ta zone cardio.</div>';
   h += '<div class="lhd">Programme</div><div class="list">' + fieldRow('Début', 'date', 'profile.startDate', P.startDate) + fieldRow('Durée', 'num', 'profile.weeks', P.weeks, 'sem.') + '</div>';
   h += '<div class="lhd">Planning</div>' + seg('mode', [['fixed', 'Jours du coach'], ['rotation', 'Rotation']], T.mode) + '<div class="foot" style="margin-top:-4px">' + (T.mode === 'fixed' ? 'Dim jambes · Lun pec · Mar dos · Mer cardio · Jeu épaules · Ven cardio · Sam repos.' : 'La séance suivante vient quand tu as terminé la précédente : pratique si tes horaires de travail changent.') + '</div>';
   h += '<div class="lhd">Je m’entraîne plutôt le</div>' + seg('train', [['matin', 'Matin'], ['aprem', 'Après-midi'], ['soir', 'Soir']], T.trainTime) + '<div class="list">' + fieldRow('Heure du coucher', 'time', 'settings.bedtime', T.bedtime) + '</div><div class="foot">Ton planning de repas suit les consignes du coach selon l’heure de ta séance, et le dîner se cale 1 h 30 à 2 h avant de dormir.</div>';
@@ -3097,7 +3119,7 @@ function setSetting(path, val, type) {
   if (['height', 'startWeight', 'goal', 'weeks'].indexOf(k) >= 0) {
     const v = parseNum(val); if (isNaN(v) || v <= 0) { rerenderSheet('settings'); return; }
     obj[k] = k === 'weeks' ? Math.round(clamp(v, 1, 104)) : Math.round(v * 10) / 10;
-  } else if (k === 'startDate') { if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) return; obj[k] = val; }
+  } else if (k === 'startDate' || k === 'birth') { if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) return; obj[k] = val; }
   else if (k === 'name') obj[k] = String(val).trim().slice(0, 24);
   else obj[k] = val;
   save(); refresh(); rerenderSheet('settings');
@@ -3491,7 +3513,7 @@ function applyState(o, msg) {
   o.settings = Object.assign(d.settings, o.settings || {});
   if (!isEmptyState(o)) o.onboarded = true;
   S = o;
-  registerCustom(); applyProgram();
+  registerCustom(); applyProgram(); applyDietAdj();
   save(true); mirrorNow();
   try { stopRest(); vxStop(); } catch (e) { /* ignore */ }
   closeAll(); applyTheme(); renderMini(); render(TAB, true);
@@ -3812,8 +3834,8 @@ function healthFetch(force) {
     const changed = !HEALTH || HEALTH.at !== o.at;
     HEALTH = o;
     try { localStorage.setItem(HEALTH_KEY, JSON.stringify(o)); } catch (e) { /* ignore */ }
-    healthApplyWeights();
-    if (changed) { if (!SHEETS.length) refresh(); softRerender('settings'); softRerender('sleep'); }
+    healthApplyWeights(); healthApplySteps();
+    if (changed) { if (!SHEETS.length) refresh(); softRerender('settings'); softRerender('sleep'); softRerender('steps'); }
     return changed;
   }).catch(() => false);
 }
@@ -3849,9 +3871,17 @@ function healthNights() {
   return m;
 }
 function sleepOn(k) { return healthNights()[k] || null; }
-function stepsOn(k) { return HEALTH && HEALTH.steps && HEALTH.steps[k] != null ? HEALTH.steps[k] : null; }
+function stepsOn(k) { if (HEALTH && HEALTH.steps && HEALTH.steps[k] != null) return HEALTH.steps[k]; return S.steps && S.steps[k] != null ? S.steps[k] : null; }
+/* les pas sont recopiés dans tes données : l'historique dépasse les 35 jours lus dans Samsung Health et part dans la sauvegarde */
+function healthApplySteps() {
+  if (!HEALTH || !HEALTH.steps) return;
+  if (!S.steps) S.steps = {};
+  let ch = false;
+  Object.keys(HEALTH.steps).forEach(d => { const v = +HEALTH.steps[d]; if (/^\d{4}-\d{2}-\d{2}$/.test(d) && v >= 0 && S.steps[d] !== v) { S.steps[d] = v; ch = true; } });
+  if (ch) save();
+}
 function sleepAvg(n) { const m = healthNights(); let s = 0, c = 0; for (let i = 0; i < n; i++) { const x = m[addDays(dkey(), -i)]; if (x) { s += x.min; c++; } } return c ? s / c : null; }
-function santeSum() { return plural(Object.keys(healthNights()).length, 'nuit') + ' · ' + plural(Object.keys((HEALTH && HEALTH.steps) || {}).length, 'jour') + ' de pas'; }
+function santeSum() { return plural(Object.keys(healthNights()).length, 'nuit') + ' · ' + plural(Object.keys(stepsAll()).length, 'jour') + ' de pas'; }
 /* lien qui ouvre l'appli Santé et lui transmet la sauvegarde cloud (jeton + dépôt) */
 function santeLink() {
   const q = 't=' + encodeURIComponent(CLOUD.token) + '&r=' + encodeURIComponent(CLOUD.owner + '/' + CLOUD.repo);
@@ -4186,9 +4216,9 @@ window.mcHealth = function (o) {
   if (!o || o.app !== 'my-coach-sante') { softRerender('settings'); if (wait) toast('Autorise d’abord l’accès à Samsung Health', 'info', 'var(--orange)'); return; }
   HEALTH = o;
   try { localStorage.setItem(HEALTH_KEY, JSON.stringify(o)); } catch (e) { /* ignore */ }
-  healthApplyWeights();
+  healthApplyWeights(); healthApplySteps();
   if (!SHEETS.length) refresh();
-  softRerender('settings'); softRerender('sleep');
+  softRerender('settings'); softRerender('sleep'); softRerender('steps');
   if (wait) toast('Samsung Health à jour · ' + santeSum(), 'check');
 };
 window.mcHealthAuth = function (ok) {
@@ -4216,6 +4246,268 @@ function natBoot() {
   natCloud();
   natReminders();
   natHealthRead(false);
+}
+/* =========================================================
+   COACH SCIENTIFIQUE : pas, besoins, composition, bilan adaptatif, plateau
+   Chaque repère vient d'une étude ou d'une recommandation reconnue (voir SCI plus bas).
+   ========================================================= */
+
+/* ---------- profil ---------- */
+function ageY() {
+  const b = S.profile.birth; if (!b || !/^\d{4}-\d{2}-\d{2}$/.test(b)) return null;
+  const d = parseD(b), n = new Date();
+  let a = n.getFullYear() - d.getFullYear();
+  if (n.getMonth() < d.getMonth() || (n.getMonth() === d.getMonth() && n.getDate() < d.getDate())) a--;
+  return a >= 14 && a < 100 ? a : null;
+}
+function isMale() { return S.profile.sex !== 'f'; }
+/* espaces insécables dans les nombres (8 000) pour éviter les retours à la ligne */
+function nbN(s) { return String(s).replace(/(\d) (\d{3})(?!\d)/g, '$1' + NB + '$2'); }
+function curW() { const ws = weightStats(); return ws ? ws.trend : (S.profile.startWeight || 80); }
+/* métabolisme de base : Mifflin-St Jeor (Frankenfield 2005 : la plus fiable des formules courantes) */
+function bmr() { const a = ageY() || 30, h = S.profile.height || 175; return 10 * curW() + 6.25 * h - 5 * a + (isMale() ? 5 : -161); }
+function sessPerWeek() { const from = addDays(dkey(), -28); return S.sessions.filter(s => (s.kind === 'muscu' || s.kind === 'cardio') && s.date >= from).length / 4; }
+/* FC max : Tanaka 2001 (208 − 0,7 × âge) ; zone 2 ≈ 60 à 70 % */
+function hrZ2() { const a = ageY(); if (!a) return ''; const m = 208 - 0.7 * a; return Math.round(m * 0.6) + ' à ' + Math.round(m * 0.7) + ' bpm (FC max ≈ ' + Math.round(m) + ')'; }
+
+/* ---------- pas ---------- */
+function stepsAll() { return Object.assign({}, S.steps || {}, (HEALTH && HEALTH.steps) || {}); }
+/* moyenne des n jours terminés (aujourd'hui exclu), en sautant les « skip » jours les plus récents */
+function stepsAvg(n, skip) {
+  const A = stepsAll(), t = dkey(), o = skip || 0; let s = 0, c = 0;
+  for (let i = 1 + o; i <= n + o; i++) { const v = A[addDays(t, -i)]; if (v != null) { s += v; c++; } }
+  return c >= Math.min(3, n) ? Math.round(s / c) : null;
+}
+function stepsStreak() {
+  const A = stepsAll(), g = stepGoal(), t = dkey();
+  let k = (A[t] || 0) >= g ? t : addDays(t, -1), n = 0;
+  while ((A[k] || 0) >= g && n < 3000) { n++; k = addDays(k, -1); }
+  return n;
+}
+function stepsBest() { const A = stepsAll(); let b = null; Object.keys(A).forEach(d => { if (!b || A[d] > b.n) b = { d: d, n: A[d] }; }); return b; }
+function strideKm() { return 0.415 * (S.profile.height || 175) / 100000; }
+function walkMin(steps) { return Math.max(1, Math.round(steps / 110)); }
+/* marche à ~5 km/h ≈ 2,5 MET nets : ≈ 0,0004 kcal par pas et par kg */
+function stepsKcal(steps) { return Math.round(steps * 0.0004 * curW() / 10) * 10; }
+function setStepGoal(v) { S.settings.stepGoal = clamp(Math.round(v / 500) * 500, 2000, 30000); save(); refresh(); rerenderSheet('steps'); toast('Objectif : ' + num(S.settings.stepGoal) + ' pas par jour', 'walk', 'var(--green)'); }
+function stepsBars(D, A, g, lab) {
+  const mx = Math.max(g * 1.25, Math.max.apply(null, D.map(d => A(d) || 0)));
+  return D.map(d => { const v = A(d); return '<div class="c"><div class="bw">' + (v != null ? '<i style="height:' + (clamp(v / mx, 0.03, 1) * 100).toFixed(1) + '%;background:' + (v >= g ? '#30D158' : 'rgba(48,209,88,.42)') + '"></i>' : '') + '</div><span>' + lab(d) + '</span></div>'; }).join('') +
+    '<b class="goal" style="--g:' + (g / mx).toFixed(3) + ';--gc:rgba(48,209,88,.85)"></b>';
+}
+function stepsBody() {
+  const A = stepsAll(), days = Object.keys(A).sort(), t = dkey(), g = stepGoal();
+  if (!days.length) return emptyState('walk', 'Pas encore de pas', NATIVE ? 'Autorise les pas : Samsung Health → Paramètres → Health Connect. Ils arriveront ici tout seuls.' : 'Installe l’appli Android My Coach : elle récupère tes pas de Samsung Health chaque jour.', NATIVE ? '<button class="btn btn-p" data-act="healthAuth">Autoriser Samsung Health</button>' : '<a class="btn btn-p" href="' + SANTE_APK + '">Installer l’appli Android</a>');
+  const today = A[t] || 0, a7 = stepsAvg(7), p7 = stepsAvg(7, 7), a14 = stepsAvg(14), a28 = stepsAvg(28), p28 = stepsAvg(28, 28), best = stepsBest(), streak = stepsStreak(), left = Math.max(0, g - today);
+  const ok7 = [0, 1, 2, 3, 4, 5, 6].filter(i => (A[addDays(t, -i)] || 0) >= g).length;
+  let h = '<div class="card"><div class="ch">' + ic('walk') + '<span style="color:#30D158">Aujourd’hui</span><span class="r">objectif ' + num(g) + '</span></div><div class="big" style="font-size:40px;color:#30D158">' + num(today) + '<small style="font-size:17px;color:var(--t2)"> pas</small></div>' +
+    '<div class="bar" style="--c:#30D158;margin-top:10px"><i style="width:' + (clamp(today / g, 0, 1) * 100).toFixed(1) + '%"></i></div><div class="tiny" style="margin-top:9px">' + num(today * strideKm(), 1) + NB + 'km · ≈ ' + num(stepsKcal(today)) + NB + 'kcal dépensées en marchant · ' + (left ? 'encore ' + num(left) + ' pas, ≈ ' + walkMin(left) + NB + 'min de marche' : 'objectif atteint, bravo !') + '</div></div>';
+  h += '<div class="kpis">' + kpi('Moyenne 7 jours', a7 != null ? num(a7) : '—', '', a7 != null && p7 ? (a7 >= p7 ? '+' : '−') + Math.abs(Math.round((a7 / p7 - 1) * 100)) + ' % vs semaine d’avant' : 'Jours terminés') + kpi('Objectif atteint', ok7 + '/7', '', 'Sur les 7 derniers jours') + kpi('Série', plural(streak, 'jour'), '', num(g) + ' pas ou plus') + kpi('Record', best ? num(best.n) : '—', '', best ? cap(relDay(best.d)) : '') + '</div>';
+  const D = []; for (let i = 13; i >= 0; i--) D.push(addDays(t, -i));
+  h += '<div class="card"><div class="ch">' + ic('chart') + 'Pas par jour<span class="r">14 jours</span></div><div class="slb">' + stepsBars(D, d => A[d], g, d => JOURS_C[parseD(d).getDay()].charAt(0)) + '</div></div>';
+  const mon = weekMon(t), W = [], WV = {};
+  for (let i = 7; i >= 0; i--) { const m0 = addDays(mon, -7 * i); let s = 0, c = 0; for (let j = 0; j < 7; j++) { const d = addDays(m0, j); if (d >= t) break; if (A[d] != null) { s += A[d]; c++; } } W.push(m0); WV[m0] = c ? s / c : null; }
+  if (W.filter(m => WV[m] != null).length >= 2) {
+    h += '<div class="card"><div class="ch">' + ic('chart') + 'Moyenne par semaine<span class="r">8 semaines</span></div><div class="slb wk">' + stepsBars(W, m => WV[m], g, m => parseD(m).getDate() + '/' + (parseD(m).getMonth() + 1)) + '</div>' +
+      (a28 && p28 ? '<div class="tiny" style="margin-top:8px">Sur 4 semaines : <b style="color:' + (a28 >= p28 ? 'var(--green)' : 'var(--orange)') + '">' + (a28 >= p28 ? '+' : '−') + Math.abs(Math.round((a28 / p28 - 1) * 100)) + ' %</b> de pas par rapport au mois d’avant.</div>' : '') + '</div>';
+  }
+  const sug = a14 != null && a14 < g - 1500 ? Math.round((a14 + 1000) / 500) * 500 : null;
+  h += '<div class="list ic">' + row('target', '#30D158', 'Objectif quotidien', num(g) + ' pas · repère ' + num(8000) + ' à ' + num(10000) + ' avant 60 ans', 'stepGoal') + '</div>';
+  if (sug) h += '<div class="foot" style="padding-top:0">Monte par paliers : ta moyenne est de ' + num(a14) + ' pas. Vise d’abord <b style="color:var(--t1)">' + num(sug) + '</b> par jour, puis +' + num(1000) + ' chaque semaine. <button class="lnk" data-act="stepGoalSet" data-v="' + sug + '">Prendre ' + num(sug) + '</button></div>';
+  h += '<div class="list">' + days.slice().reverse().slice(0, 14).map(d => '<div class="row"><div class="rt"><div class="t1" style="font-size:16px">' + cap(relDay(d)) + '</div><div class="t2">' + num(A[d] * strideKm(), 1) + NB + 'km</div></div><div class="rv" style="font-size:16px;font-weight:600;color:' + (A[d] >= g ? 'var(--green)' : 'var(--t1)') + '">' + num(A[d]) + '</div></div>').join('') + '</div>';
+  h += '<div class="foot">Pas de Samsung Health' + (HEALTH ? ', reçus ' + agoTxt(HEALTH.at) : '') + ' (avec quelques minutes de décalage). L’historique reste dans ta sauvegarde, jour après jour.</div>';
+  return h;
+}
+function stepsSheetHTML() { return shHead('Pas') + '<div class="sh-body">' + stepsBody() + '</div>'; }
+
+/* ---------- besoins : dépense, déficit, protéines, lipides ---------- */
+function latestMeas(k) { const M = S.measures.filter(m => m[k] != null).sort((a, b) => a.d < b.d ? -1 : 1); const m = M[M.length - 1]; return m ? { d: m.d, v: m[k] } : null; }
+/* % de gras : formule US Navy (Hodgdon et Beckett 1984), mesures en pouces */
+function navyBF(m) {
+  const h = S.profile.height, inch = x => x / 2.54;
+  if (!m || !m.waist || !m.neck || !h) return null;
+  let bf;
+  if (isMale()) { if (m.waist - m.neck < 10) return null; bf = 86.010 * Math.log10(inch(m.waist - m.neck)) - 70.041 * Math.log10(inch(h)) + 36.76; }
+  else { if (!m.hips || m.waist + m.hips - m.neck < 20) return null; bf = 163.205 * Math.log10(inch(m.waist + m.hips - m.neck)) - 97.684 * Math.log10(inch(h)) - 78.387; }
+  return bf > 3 && bf < 65 ? bf : null;
+}
+function bfEntries() { return S.measures.filter(m => navyBF(m) != null).sort((a, b) => a.d < b.d ? -1 : 1); }
+function bodyFat() { const E = bfEntries(); return E.length ? navyBF(E[E.length - 1]) : null; }
+function needs() {
+  const w = curW(), st = stepsAvg(14), spw = sessPerWeek();
+  /* activité : ~1,4 sans bouger, +0,02 par tranche de 1 000 pas au-delà de 3 500 (≈ 40 kcal), +0,02 par séance hebdo */
+  const pal = clamp(1.4 + Math.max(0, (st == null ? 5000 : st) - 3500) * 0.00002 + spw * 0.02, 1.35, 2.0);
+  const b = bmr(), tdee = b * pal, def = tdee - DIET.kcal, bf = bodyFat(), lbm = bf ? w * (1 - bf / 100) : null;
+  const ref = S.profile.goal && S.profile.goal < w ? S.profile.goal : w;
+  return { w: w, a: ageY(), b: b, pal: pal, st: st, spw: spw, tdee: tdee, def: def, wk: def * 7 / 7700, bf: bf, lbm: lbm,
+    pr: lbm ? [2.3 * lbm, 3.1 * lbm, 'selon ta masse maigre (2,3 à 3,1 g/kg)'] : [1.6 * ref, 2.2 * ref, 'selon ton poids visé (1,6 à 2,2 g/kg)'], fat: DIET.l * 9 / DIET.kcal * 100 };
+}
+function chk(ok, t, s) { return '<div class="nc"><span style="color:' + (ok ? 'var(--green)' : 'var(--orange)') + '">' + ic(ok ? 'check' : 'info') + '</span><div><b>' + t + '</b><small>' + s + '</small></div></div>'; }
+function needsCard() {
+  const n = needs(), r10 = x => Math.round(x / 10) * 10, lo = 0.005 * n.w, hi = 0.01 * n.w;
+  let h = '<div class="card"><div class="ch">' + ic('gauge') + '<span style="color:var(--orange)">Tes besoins</span><button class="lnk r" data-act="science">Méthode</button></div>';
+  h += '<div class="nd"><div><div class="k">Dépense estimée</div><div class="big">' + num(r10(n.tdee)) + '<small> kcal/j</small></div></div><div><div class="k">Avec la diète</div><div class="big" style="color:' + (n.def > 0 ? 'var(--green)' : 'var(--orange)') + '">' + (n.def > 0 ? '−' : '+') + num(Math.abs(r10(n.def))) + '<small> kcal/j</small></div></div></div>';
+  h += '<div class="tiny" style="margin-top:8px">Métabolisme de base ' + num(r10(n.b)) + NB + 'kcal (' + (n.a ? n.a + ' ans' : 'âge non renseigné') + ', ' + num(S.profile.height) + NB + 'cm, ' + num(n.w, 1) + NB + 'kg) × activité ' + num(n.pal, 2) + ' (' + (n.st != null ? num(n.st) + ' pas/j' : 'pas inconnus') + ', ' + num(n.spw, 1) + ' séance' + (n.spw >= 2 ? 's' : '') + '/sem).</div>';
+  h += '<div class="nchk">' + chk(n.wk >= lo * 0.85 && n.wk <= hi * 1.15, 'Perte prévue : ≈ ' + num(Math.max(0, n.wk), 1) + NB + 'kg/sem', 'Repère : 0,5 à 1 % du poids, soit ' + num(lo, 1) + ' à ' + num(hi, 1) + NB + 'kg') +
+    chk(DIET.p >= n.pr[0] * 0.95 && DIET.p <= n.pr[1] * 1.1, 'Protéines : ' + DIET.p + NB + 'g (' + num(DIET.p / n.w, 1) + NB + 'g/kg)', 'Repère : ' + Math.round(n.pr[0]) + ' à ' + Math.round(n.pr[1]) + NB + 'g, ' + n.pr[2]) +
+    chk(n.fat >= 15 && n.fat <= 30, 'Lipides : ' + Math.round(n.fat) + ' % des calories', 'Repère : 15 à 30 %') + '</div>';
+  if (!n.a) h += '<button class="btn btn-f btn-b" data-act="settings" style="margin-top:12px">' + ic('person') + 'Ajouter ma date de naissance</button>';
+  return h + '</div>';
+}
+
+/* ---------- bilan adaptatif (toutes les 2 semaines, sur la vraie courbe de poids) ---------- */
+const COACH_STEP = 150;
+function coachState() { if (!S.coach) S.coach = { adj: 0, log: [], snooze: '' }; return S.coach; }
+function kcalFloor() { return Math.max(isMale() ? 1500 : 1200, Math.round(bmr() / 10) * 10); }
+function riceFood() { for (const m of MEALS) { const f = m.foods.find(x => x.id === 'riz'); if (f) return f; } return null; }
+function riceGrams(adj) { const f = riceFood(); if (!f) return 0; const b = f.base || { kcal: f.kcal, sg: f.shop.g }; return adj ? Math.max(40, Math.round((b.sg + adj / (b.kcal / b.sg)) / 5) * 5) : b.sg; }
+/* l'ajustement passe par le riz du soir : le reste de la diète du coach ne bouge pas */
+function applyDietAdj() {
+  const adj = (S.coach && S.coach.adj) || 0;
+  MEALS.forEach(m => m.foods.forEach(f => {
+    if (!f.base) f.base = { q: f.q, kcal: f.kcal, p: f.p, l: f.l, g: f.g, sg: f.shop && f.shop.g };
+    if (f.id !== 'riz') return;
+    const b = f.base, gr = riceGrams(adj), r = gr / b.sg;
+    f.kcal = b.kcal * r; f.p = b.p * r; f.l = b.l * r; f.g = b.g * r; f.shop.g = gr;
+    f.q = gr === b.sg ? b.q : gr + ' g (pesé cru, ajusté)';
+  }));
+  MEALS.forEach(m => { ['kcal', 'p', 'l', 'g'].forEach(k => { m[k] = m.foods.reduce((a, f) => a + f[k], 0); }); });
+  ['kcal', 'p', 'l', 'g'].forEach(k => { DIET[k] = Math.round(MEALS.reduce((a, m) => a + m[k], 0)); });
+  DIET.name = adj ? 'Diète 1 ajustée' : 'Diète 1';
+}
+function waistChange() {
+  const M = S.measures.filter(m => m.waist != null).sort((a, b) => a.d < b.d ? -1 : 1), b = M[M.length - 1];
+  if (!b || diffDays(b.d, dkey()) > 14) return null;
+  const a = M.filter(m => diffDays(m.d, b.d) >= 14 && diffDays(m.d, b.d) <= 42)[0];
+  return a ? b.waist - a.waist : null;
+}
+function coachReview() {
+  const C = coachState(), t = dkey(), ws = weightStats(), W = S.weights.slice().sort((a, b) => a.d < b.d ? -1 : 1);
+  if (!ws || W.length < 6 || diffDays(W[0].d, t) < 14) return { st: 'need' };
+  if (W.filter(w => w.d > addDays(t, -14)).length < 4) return { st: 'need', recent: true };
+  const pct = ws.perWeek / ws.trend * 100, last = C.log[C.log.length - 1], since = last ? diffDays(last.d, t) : 999, waist = waistChange();
+  let st = 'ok', act = 0;
+  if (pct > -0.5) {
+    if (waist != null && waist <= -1) st = 'recomp';
+    else if (since < 14) st = 'wait';
+    else if (DIET.kcal - COACH_STEP < kcalFloor()) st = 'floor';
+    else { st = 'slow'; act = -COACH_STEP; }
+  } else if (pct < -1) {
+    if (diffDays(W[0].d, t) < 21) st = 'early';
+    else if (since < 14) st = 'wait';
+    else if (C.adj >= 2 * COACH_STEP) st = 'fastmax';
+    else { st = 'fast'; act = COACH_STEP; }
+  }
+  return { st: st, act: act, pct: pct, perWeek: ws.perWeek, waist: waist, since: since };
+}
+function reviewCard(where) {
+  const r = coachReview(), C = coachState(), t = dkey();
+  if (where === 'today' && !(r.act && (!C.snooze || diffDays(C.snooze, t) >= 7))) return '';
+  const sg = x => (x <= 0 ? '−' : '+') + num(Math.abs(x), 1);
+  const rice = d => 'riz du soir à ' + riceGrams(C.adj + d) + NB + 'g au lieu de ' + riceGrams(C.adj) + NB + 'g';
+  const MSG = {
+    need: r.recent ? 'Pèse-toi au moins 2 fois par semaine : le bilan se base sur ta courbe de poids lissée.' : 'Premier bilan après 2 semaines de pesées (6 au minimum). Pèse-toi le matin, à jeun.',
+    ok: 'Parfait : tu perds entre 0,5 et 1 % de ton poids par semaine. On ne change rien.',
+    recomp: 'Le poids bouge peu, mais ton tour de taille a baissé de ' + num(-r.waist, 1) + NB + 'cm : tu perds du gras et tu gagnes du muscle. On ne change rien.',
+    slow: 'Tu perds moins de 0,5 % par semaine. Proposition : 150 kcal de moins, soit ' + rice(-COACH_STEP) + '.',
+    fast: 'Tu perds plus de 1 % par semaine : tu risques de perdre du muscle. Proposition : 150 kcal de plus, soit ' + rice(COACH_STEP) + '.',
+    floor: 'Tu es déjà au plancher (' + num(kcalFloor()) + NB + 'kcal, ton métabolisme de base) : on ne baisse plus. Ajoute plutôt ' + num(2000) + ' pas par jour (≈ ' + stepsKcal(2000) + NB + 'kcal).',
+    wait: 'Dernier ajustement il y a ' + plural(r.since, 'jour') + ' : on attend 2 semaines pour en juger l’effet.',
+    early: 'Les 3 premières semaines, la balance descend vite (eau et glycogène) : on attend avant d’ajuster.',
+    fastmax: 'Tu perds vite malgré 300 kcal de plus : parles-en à ton coach.'
+  };
+  let h = '<div class="card coachr"><div class="ch">' + ic('sparkle') + '<span style="color:var(--purple)">Bilan du coach</span><span class="r">' + (r.pct != null ? sg(r.pct) + NB + '%/sem' : '') + '</span></div><div class="cr-t">' + (r.pct != null ? 'Rythme : ' + sg(r.perWeek) + NB + 'kg par semaine. ' : '') + MSG[r.st] + '</div>';
+  if (C.adj) h += '<div class="tiny" style="margin-top:8px">Ajustement en cours : ' + (C.adj > 0 ? '+' : '−') + Math.abs(C.adj) + NB + 'kcal (riz du soir ' + riceGrams(C.adj) + NB + 'g).</div>';
+  if (r.act) h += '<div class="cr-b"><button class="btn btn-p btn-s" data-act="coachApply" data-v="' + r.act + '">Appliquer</button>' + (where === 'today' ? '<button class="btn btn-f btn-s" data-act="coachLater">Plus tard</button>' : '') + '</div>';
+  else if (C.adj && where !== 'today') h += '<button class="lnk" data-act="coachReset" style="margin-top:10px;padding:0">Revenir à la diète du coach</button>';
+  return h + '</div>';
+}
+function coachApply(v) {
+  const C = coachState(); C.adj += v; C.log.push({ d: dkey(), v: v, adj: C.adj }); C.snooze = '';
+  applyDietAdj(); save(); refresh();
+  toast('Diète ajustée : ' + (v > 0 ? '+' : '−') + Math.abs(v) + ' kcal · riz ' + riceGrams(C.adj) + ' g', 'fork', 'var(--green)');
+}
+function coachReset() {
+  const C = coachState(); if (!C.adj) return;
+  C.log.push({ d: dkey(), v: -C.adj, adj: 0 }); C.adj = 0;
+  applyDietAdj(); save(); refresh(); toast('Retour à la diète du coach', 'fork', 'var(--green)');
+}
+
+/* ---------- composition corporelle ---------- */
+function muscleReading() {
+  const T = trend(); if (T.length < 2) return '';
+  let n = 0, sum = 0, d0 = null, d1 = null;
+  ['arm', 'chest', 'thigh'].forEach(k => {
+    const M = S.measures.filter(m => m[k] != null).sort((a, b) => a.d < b.d ? -1 : 1), b = M[M.length - 1]; if (!b) return;
+    const a = M.filter(m => diffDays(m.d, b.d) >= 21).pop(); if (!a) return;
+    n++; sum += b[k] - a[k]; if (!d0 || a.d < d0) d0 = a.d; if (!d1 || b.d > d1) d1 = b.d;
+  });
+  if (!n) return '';
+  const wAt = d => (T.filter(p => p.d <= d).pop() || T[0]).t, dw = wAt(d1) - wAt(d0), avg = sum / n;
+  if (dw <= -1.5 && avg >= -0.5) return 'Ton poids a baissé de ' + num(-dw, 1) + NB + 'kg, mais bras, poitrine et cuisses tiennent : tu perds surtout du gras.';
+  if (dw <= -1.5) return 'Bras, poitrine et cuisses baissent aussi (' + num(avg, 1) + NB + 'cm en moyenne) : c’est en partie du gras local, mais garde tes charges et tes protéines au niveau.';
+  if (dw > -0.5 && avg > 0.3) return 'Poids stable et tours de bras, poitrine, cuisses en hausse : tu prends du muscle.';
+  return '';
+}
+function bodyCard() {
+  const w = curW(), hgt = S.profile.height || 175, wa = latestMeas('waist'), hi = latestMeas('hips'), E = bfEntries(), bf = bodyFat(), rows = [];
+  const R = (t, v, s, c) => '<div class="row"><div class="rt"><div class="t1">' + t + '</div><div class="t2">' + s + '</div></div><div class="rv" style="font-size:17px;font-weight:700;color:' + (c || 'var(--t1)') + '">' + v + '</div></div>';
+  if (bf) {
+    let s = 'Masse maigre ' + num(w * (1 - bf / 100), 1) + NB + 'kg · gras ' + num(w * bf / 100, 1) + NB + 'kg';
+    if (E.length > 1) { const f0 = navyBF(E[0]), dd = bf - f0; s += ' · ' + (dd <= 0 ? '−' : '+') + num(Math.abs(dd), 1) + ' point' + (Math.abs(dd) >= 2 ? 's' : '') + ' depuis le ' + fmtDayC(E[0].d); }
+    rows.push(R('Masse grasse (estimation)', num(bf, 1) + ' %', s));
+  } else rows.push(R('Masse grasse (estimation)', '—', 'Mesure ton tour de cou' + (isMale() ? '' : ' et tes hanches') + ' pour l’estimer'));
+  if (wa) { const r = wa.v / hgt; rows.push(R('Tour de taille / taille', num(r, 2), r < 0.5 ? 'Zone saine (moins de 0,5)' : r < 0.6 ? 'Risque augmenté (0,5 à 0,6) · vise moins de ' + Math.floor(hgt / 2) + NB + 'cm' : 'Risque élevé (0,6 et plus) · palier : ' + Math.floor(hgt * 0.6) + NB + 'cm, puis ' + Math.floor(hgt / 2), r < 0.5 ? 'var(--green)' : r < 0.6 ? 'var(--orange)' : 'var(--red)')); }
+  if (wa && hi) { const r = wa.v / hi.v, th = isMale() ? 0.9 : 0.85; rows.push(R('Taille / hanches', num(r, 2), (r < th ? 'Sous' : 'Au-dessus du') + ' seuil OMS (' + num(th, 2) + ')', r < th ? 'var(--green)' : 'var(--orange)')); }
+  const bmi = w / Math.pow(hgt / 100, 2);
+  rows.push(R('IMC', num(bmi, 1), 'Indicatif : ne distingue pas le muscle du gras'));
+  const mr = muscleReading();
+  return '<div class="sec"><h2>Composition</h2><button class="lnk" data-act="science">Méthode</button></div><div class="list">' + rows.join('') + '</div>' + (mr ? '<div class="foot">' + mr + '</div>' : '');
+}
+
+/* ---------- plateau de force : séance allégée (décharge) ---------- */
+let PL_CACHE = { k: '', m: {} };
+function plateau(ex) {
+  if (!ex || ex.mode || ex.load === 'pdc') return null;
+  const key = S.sessions.length + ':' + (S.sessions.length ? S.sessions[S.sessions.length - 1].end : 0);
+  if (PL_CACHE.k !== key) PL_CACHE = { k: key, m: {} };
+  if (ex.id in PL_CACHE.m) return PL_CACHE.m[ex.id];
+  let H = exHistory(ex.id, true), res = null;
+  const k = H.map(x => !!x.dl).lastIndexOf(true); if (k >= 0) H = H.slice(k + 1);
+  if (H.length >= 4) {
+    const base = Math.max.apply(null, H.slice(0, -3).map(x => x.best ? x.best.e1 : 0)), top = H[H.length - 1].top;
+    const st = ex.step || ex.inc || 1;
+    if (base > 0 && top > 0 && H.slice(-3).every(x => !x.best || x.best.e1 <= base + 1e-6)) res = { w: Math.max(st, roundTo(Math.floor(top * 0.9 / st + 1e-9) * st, st)), from: top };
+  }
+  PL_CACHE.m[ex.id] = res;
+  return res;
+}
+
+/* ---------- bases scientifiques ---------- */
+const SCI = [
+  { ic: 'flame', c: '#FF9F0A', t: 'Dépense d’énergie', s: 'Métabolisme de base par l’équation de Mifflin-St Jeor (poids, taille, âge, sexe) : la plus fiable des formules courantes, à ±10 % pour la plupart des gens. Il est multiplié par ton activité réelle : tes pas des 14 derniers jours et tes séances.',
+    l: [['Frankenfield 2005 · revue systématique des équations', 'https://pure.psu.edu/en/publications/comparison-of-predictive-equations-for-resting-metabolic-rate-in-/'], ['Tudor-Locke 2004 · niveaux d’activité selon les pas', 'https://pubmed.ncbi.nlm.nih.gov/14715035/']] },
+  { ic: 'scale', c: '#0A84FF', t: 'Rythme de perte', s: '0,5 à 1 % du poids par semaine : assez vite pour avancer, assez lentement pour garder le muscle. Chez des athlètes, perdre 0,7 % par semaine a mieux préservé la masse maigre et la force que 1,4 %.',
+    l: [['Helms 2014 · recommandations fondées sur les preuves', 'https://pmc.ncbi.nlm.nih.gov/articles/PMC4033492'], ['Garthe 2011 · perte lente ou rapide', 'https://www.pubmed.gov/21896944/']] },
+  { ic: 'sparkle', c: '#BF5AF2', t: 'Bilan adaptatif', s: 'Une formule peut se tromper de 10 %. Toutes les 2 semaines, le coach compare ta vraie courbe de poids (lissée) à la cible et te propose ±150 kcal, jamais sous ton métabolisme de base. Si ton tour de taille baisse alors que le poids stagne, on ne touche à rien : c’est du gras perdu et du muscle gagné.', l: [] },
+  { ic: 'fork', c: '#30D158', t: 'Protéines et lipides', s: 'Au-delà de 1,6 g par kg et par jour, les protéines n’apportent en moyenne plus de muscle en plus (jusqu’à 2,2 g/kg pour les plus réceptifs). En déficit, 2,3 à 3,1 g par kg de masse maigre protègent le muscle. Lipides : 15 à 30 % des calories.',
+    l: [['Morton 2018 · méta-analyse de 49 essais', 'https://pubmed.ncbi.nlm.nih.gov/28698222/'], ['Helms 2014', 'https://pmc.ncbi.nlm.nih.gov/articles/PMC4033492']] },
+  { ic: 'walk', c: '#30D158', t: 'Pas', s: 'Avant 60 ans, le risque de mortalité baisse jusqu’à 8 000 à 10 000 pas par jour, puis se stabilise (6 000 à 8 000 après 60 ans). Pour progresser sans te blesser : +1 000 pas par semaine.',
+    l: [['Paluch 2022 · 15 cohortes, The Lancet Public Health', 'https://pubmed.ncbi.nlm.nih.gov/35247352/']] },
+  { ic: 'heart', c: '#FF375F', t: 'Fréquence cardiaque', s: 'FC max estimée = 208 − 0,7 × âge, plus juste que « 220 − âge ». Zone 2 ≈ 60 à 70 % de la FC max : l’allure où tu peux encore parler.',
+    l: [['Tanaka 2001 · FC max selon l’âge', 'https://pubmed.ncbi.nlm.nih.gov/11153730/']] },
+  { ic: 'ruler', c: '#64D2FF', t: 'Composition corporelle', s: '% de gras par la formule de l’US Navy (tour de taille au nombril, cou, taille ; hanches pour les femmes), établie par pesée hydrostatique. Tour de taille / taille : moins de 0,5 = zone saine, 0,5 à 0,6 = risque augmenté, 0,6 et plus = risque élevé. Taille / hanches : seuil OMS de 0,90 (hommes) et 0,85 (femmes). Bras, poitrine et cuisses montrent si le muscle tient pendant la perte.',
+    l: [['Hodgdon et Beckett 1984 · formule US Navy', 'https://apps.dtic.mil/sti/pdfs/ADA143890.pdf'], ['NICE (NG246) · tour de taille / taille', 'https://www.nice.org.uk/guidance/NG246/chapter/identifying-and-assessing-overweight-obesity-and-central-adiposity'], ['OMS 2008 · tour de taille et taille/hanches', 'https://who.int/publications/i/item/9789241501491']] },
+  { ic: 'dumbbell', c: '#FF375F', t: 'Progression et décharge', s: 'Double progression du coach : +1 répétition par séance jusqu’au haut de la fourchette, puis plus de charge. Quand un exercice stagne 3 séances de suite, une séance allégée (−10 %) aide à récupérer : c’est la « décharge » décrite par le consensus d’experts.',
+    l: [['Bell 2023 · consensus Delphi sur la décharge', 'https://pmc.ncbi.nlm.nih.gov/articles/PMC10511399/']] }
+];
+function scienceHTML() {
+  let h = shHead('Bases scientifiques') + '<div class="sh-body"><div class="foot" style="padding-top:0">Les calculs de l’appli suivent des études publiées et des recommandations officielles. Ce sont des estimations : ta vraie courbe de poids sert à les corriger. Ce n’est pas un avis médical.</div>';
+  SCI.forEach(x => {
+    h += '<div class="lhd">' + x.t + '</div><div class="list ic"><div class="row"><span class="tile" style="--c:' + x.c + ';align-self:flex-start;margin-top:3px">' + ic(x.ic) + '</span><div class="rt"><div class="t2" style="font-size:15px;color:var(--t1);line-height:1.4">' + nbN(x.s) + '</div></div></div>' +
+      x.l.map(l => '<a class="row tap" href="' + l[1] + '" target="_blank" rel="noopener"><span class="tile" style="--c:#8E8E93">' + ic('link') + '</span><div class="rt"><div class="t1" style="font-size:15px">' + l[0] + '</div></div>' + ic('chev', 'chev') + '</a>').join('') + '</div>';
+  });
+  return h + '</div>';
 }
 
 /* =========================================================
@@ -4276,6 +4568,7 @@ const ACT = {
     if (n === 'tt') { day(dkey(), true).tt = v; save(); refresh(); }
     else if (n === 'prog') { PROG_SEG = v; refresh(); }
     else if (n === 'range') { RANGE = v; refresh(); }
+    else if (n === 'sex') { S.profile.sex = v; save(); refresh(); rerenderSheet('settings'); }
     else if (n === 'mode') { S.settings.mode = v; save(); refresh(); rerenderSheet('settings'); natReminders(); }
     else if (n === 'train') { S.settings.trainTime = v; save(); refresh(); rerenderSheet('settings'); }
     else if (n === 'theme') { S.settings.theme = v; save(); applyTheme(); refresh(); rerenderSheet('settings'); }
@@ -4287,6 +4580,13 @@ const ACT = {
     else if (n === 'nxeq') { NX.eq = v; rerenderSheet('newex'); }
   },
   settings: () => openSettings(),
+  stepsSheet: () => { openSheet({ id: 'steps', cls: 'full', render: stepsSheetHTML }); healthFetch(true); },
+  stepGoal: () => actionSheet('Objectif de pas par jour', [6000, 7000, 8000, 9000, 10000, 12000, 15000].map(v => ({ t: num(v) + ' pas' + (v === stepGoal() ? '  ✓' : ''), fn: () => setStepGoal(v) }))),
+  stepGoalSet: t => setStepGoal(+t.dataset.v),
+  coachApply: t => coachApply(+t.dataset.v),
+  coachLater: () => { coachState().snooze = dkey(); save(); refresh(); },
+  coachReset: () => coachReset(),
+  science: () => openSheet({ id: 'science', cls: 'full', render: scienceHTML }),
   ringsInfo: () => ringsInfo(),
   dayPeek: t => { const k = t.dataset.k; const done = sessionsOn(k); if (k > dkey()) { const p = planFor(k); if (isTrain(p)) sessionDetail(p.id); else daySheetRest(); } else daySheet(k); },
   habit: t => {

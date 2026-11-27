@@ -26,6 +26,8 @@ Une fois installée, l'app s'ouvre en plein écran et fonctionne hors connexion 
 - **Exercices à la carte** : ajoute, remplace ou retire un exo pendant la séance (machine prise…), modifie ton programme (ajouter, retirer, réordonner, revenir au programme du coach) et crée tes propres exercices. La bibliothèque ne propose que des variantes douces pour le dos.
 - **Voix du coach** : une voix d'homme annonce le repos, les 10 dernières secondes, le décompte, la série ou l'exercice suivant (avec les reps et la charge visées), et toutes les phases du minuteur (fractionné, gainage, zone 2). Elle continue **écran verrouillé, écouteurs branchés**. Dans l'appli Android, c'est la voix naturelle du téléphone (Google ou Samsung), au choix.
 - **Diète, jeûne, compléments, liste de courses**, suivi du poids (tendance lissée), mensurations, régularité et trophées.
+- **Pas jour par jour** (Samsung Health) : objectif réglable, moyenne, série, record, graphique sur 14 jours et par semaine ; l'historique est gardé dans tes données.
+- **Coach fondé sur les études** : dépense d'énergie (Mifflin-St Jeor × tes pas et tes séances), repères protéines/lipides, bilan toutes les 2 semaines sur ta vraie courbe de poids (±150 kcal proposées, garde-fou tour de taille, plancher), % de gras (formule US Navy), tour de taille/taille (NICE), taille/hanches (OMS), zone cardio selon l'âge (Tanaka), séance allégée quand un exercice stagne. Toutes les sources sont dans l'appli : Coach → Les bases scientifiques.
 
 ## Tes données
 
