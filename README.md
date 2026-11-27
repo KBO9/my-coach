@@ -16,7 +16,7 @@ Pour une mise à jour : refais l'étape 2 avec les nouveaux fichiers (ils rempla
 ## Installer sur le téléphone
 
 - **iPhone (Safari)** : ouvre le lien, bouton Partager → « Sur l'écran d'accueil ».
-- **Android (Chrome)** : menu ⋮ → « Installer l'application ».
+- **Android (Firefox ou Chrome)** : menu ⋮ → « Ajouter à l'écran d'accueil » (ou « Installer l'application »).
 
 Une fois installée, l'app s'ouvre en plein écran et fonctionne hors connexion (voix comprise).
 
@@ -56,7 +56,7 @@ L'appli **My Coach pour Android** contient tout My Coach, plus ce qu'une page we
 - **Samsung Health** : sommeil (durée, phases), pas et pesées lus directement, via Health Connect. « Sommeil 7 h+ » et « 8 000 pas » se cochent tout seuls.
 - **Notifications** : « C'est reparti ! » à la fin de chaque repos, même écran verrouillé, et rappels de séance et de pesée à l'heure choisie.
 - **Voix naturelle** : le coach parle avec les voix de synthèse du téléphone (Google ou Samsung), bien plus naturelles. Ta musique baisse le temps de la phrase au lieu de s'arrêter. Choix de la voix : Réglages → Voix du coach → Voix.
-- **Ton planning dans l'appli** : une icône **Planning** est installée avec My Coach. Elle ouvre ton appli Planning dans le même stockage que My Coach : chaque changement est vu tout de suite (séances, repas, rappels). Pour y transférer le planning de Chrome : Planning de Chrome → Réglages → Exporter, puis icône Planning → Réglages → Importer → coller.
+- **Ton planning dans l'appli** : une icône **Planning** est installée avec My Coach. Elle ouvre ton appli Planning dans le même stockage que My Coach : chaque changement est vu tout de suite (séances, repas, rappels). Pour y transférer le planning de Firefox : Planning dans Firefox → Réglages → Exporter, puis icône Planning → Réglages → Importer → coller.
 - **Toujours à jour** : l'interface se charge depuis ce site, les améliorations arrivent toutes seules.
 
 Installation :

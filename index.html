@@ -4804,7 +4804,7 @@ function plSettingsHTML() {
   if (NATIVE && !NAT_PL) h += '<a class="row tap" href="' + SANTE_APK + '"><span class="tile" style="--c:#A0618D">' + ic('down') + '</span><div class="rt"><div class="t1">Mon planning dans l’appli</div><div class="t2">Mets à jour l’appli Android pour l’ouvrir ici</div></div>' + ic('chev', 'chev') + '</a>';
   else h += row('cal', '#A0618D', 'Mon planning', st.t2, 'planOpen');
   h += row('list', '#0A84FF', 'Mes 2 prochaines semaines', 'Services, séances et heures conseillées', 'weekPlan');
-  if (NATIVE) h += row('swap', '#5E5CE6', 'Transférer mon planning de Chrome', 'Une seule fois, en 3 gestes', 'planHelp');
+  if (NATIVE) h += row('swap', '#5E5CE6', 'Transférer mon planning de Firefox', 'Une seule fois, en 3 gestes', 'planHelp');
   h += '</div><div class="foot">' + (st.linked ? 'Chaque changement dans ton planning (échange, congé, renfort, horaires) met tes séances, tes repas et tes rappels à jour tout seuls.' : 'En attendant ton planning, My Coach suit ton cycle 4/2 (mêmes horaires que dans l’appli Planning). Ouvre-le une fois ici pour le relier.') + '</div>';
   return h;
 }
@@ -4815,14 +4815,14 @@ function plOpen() {
 }
 function planHelp() {
   const steps = [
-    ['Dans Chrome', 'Ouvre ton Planning habituel → Réglages → Exporter. Il affiche «' + NB + 'Copié' + NB + '!' + NB + '».'],
+    ['Dans Firefox', 'Ouvre ton Planning habituel → Réglages → Exporter. Il affiche «' + NB + 'Copié' + NB + '!' + NB + '».'],
     ['Ici, dans My Coach', NAT_PL ? 'Réglages → Mon planning → Réglages → Importer.' : 'Mets d’abord à jour l’appli Android (bouton ci-dessous), puis Réglages → Mon planning → Réglages → Importer.'],
     ['Colle et valide', 'Appui long dans la case → Coller, puis Importer. Tes séances se recalculent aussitôt.']
   ];
-  openSheet({ id: 'plhelp', cls: 'float', html: shHead('Depuis Chrome') + '<div class="sh-body"><div class="list ic">' +
+  openSheet({ id: 'plhelp', cls: 'float', html: shHead('Depuis Firefox') + '<div class="sh-body"><div class="list ic">' +
     steps.map((x, i) => '<div class="row"><span class="tile" style="--c:#A0618D;font-size:17px;font-weight:700">' + (i + 1) + '</span><div class="rt"><div class="t1">' + x[0] + '</div><div class="t2">' + x[1] + '</div></div></div>').join('') + '</div>' +
     (NATIVE && !NAT_PL ? '<div style="padding:4px 16px 0"><a class="btn btn-p btn-b" href="' + SANTE_APK + '">Mettre à jour l’appli Android</a></div>' : '') +
-    '<div class="foot">Ensuite, ouvre ton planning avec l’icône Planning installée avec My Coach (ou depuis Réglages). Ne modifie plus la version de Chrome : My Coach ne la voit pas.</div></div>' });
+    '<div class="foot">Ensuite, ouvre ton planning avec l’icône Planning installée avec My Coach (ou depuis Réglages). Ne modifie plus la version de Firefox : My Coach ne la voit pas.</div></div>' });
 }
 function weekPlanHTML() {
   const t = dkey();
