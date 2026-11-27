@@ -29,6 +29,7 @@ import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import java.io.File
+import java.lang.ref.WeakReference
 
 /**
  * My Coach pour Android : l'appli web (toujours à jour, depuis GitHub Pages)
@@ -39,6 +40,12 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val HOME = "https://kbo9.github.io/my-coach/"
         @Volatile var visible = false
+        private var live: WeakReference<MainActivity>? = null
+
+        /** Le planning vient peut-être de changer : My Coach recalcule séances, repas et rappels. */
+        fun poke() {
+            live?.get()?.js("window.mcPlanning && mcPlanning()")
+        }
     }
 
     lateinit var web: WebView
@@ -52,6 +59,7 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        live = WeakReference(this)
         askPerms = registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { g ->
             granted = g
             val ok = g.containsAll(Health.DATA_PERMS)
@@ -158,6 +166,20 @@ class MainActivity : ComponentActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         web.saveState(outState)
+    }
+
+    override fun onDestroy() {
+        if (live?.get() === this) live = null
+        super.onDestroy()
+    }
+
+    /** Ton planning, dans l'appli (même stockage que My Coach). */
+    fun openPlanning() {
+        try {
+            startActivity(Intent(this, PlanningActivity::class.java))
+        } catch (e: Exception) {
+            js("window.toast && toast('Impossible d’ouvrir le planning', 'x', 'var(--red)')")
+        }
     }
 
     /** Liens : My Coach reste dans l'appli, le reste s'ouvre dans l'appli adaptée. */

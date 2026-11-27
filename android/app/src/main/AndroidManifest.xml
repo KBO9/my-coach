@@ -53,6 +53,25 @@
             </intent-filter>
         </activity>
 
+        <!-- Ton planning : sa propre icône, même stockage que My Coach -->
+        <activity
+            android:name=".PlanningActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|density"
+            android:exported="true"
+            android:icon="@mipmap/ic_planning"
+            android:label="Planning"
+            android:launchMode="singleTask"
+            android:roundIcon="@mipmap/ic_planning"
+            android:screenOrientation="portrait"
+            android:taskAffinity="fr.kbo9.mycoachsante.planning"
+            android:theme="@style/Theme.Planning"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
         <!-- Health Connect (Android 14 et plus) : utilisation des accès -->
         <activity-alias
             android:name="ViewPermissionUsageActivity"

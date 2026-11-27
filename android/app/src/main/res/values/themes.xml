@@ -9,4 +9,14 @@
         <item name="android:windowLightNavigationBar">true</item>
         <item name="android:colorAccent">#FF2D55</item>
     </style>
+    <style name="Theme.Planning" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/creme</item>
+        <item name="android:statusBarColor">@color/creme</item>
+        <item name="android:navigationBarColor">@color/papier</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:colorAccent">#6B3A5B</item>
+    </style>
+    <color name="creme">#F4F1EA</color>
+    <color name="papier">#FFFDF8</color>
 </resources>

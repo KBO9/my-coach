@@ -134,4 +134,13 @@ class Bridge(private val a: MainActivity) {
     fun ttsSettings() {
         a.runOnUiThread { a.openTtsSettings() }
     }
+
+    /* ---------- ton planning (appli Planning dans My Coach) ---------- */
+    @JavascriptInterface
+    fun openPlanning() {
+        a.runOnUiThread { a.openPlanning() }
+    }
+
+    @JavascriptInterface
+    fun planningOk(): Boolean = true
 }

@@ -23,6 +23,8 @@ object Notifs {
     const val CH_AUDIO = "voix"
     private const val ACT_REST = "fr.kbo9.mycoachsante.REPOS"
     private const val ACT_REMIND = "fr.kbo9.mycoachsante.RAPPEL"
+    /** rappels datés : 14 jours de séances, pesées et couchers selon le planning */
+    private const val MAX_REMIND = 64
 
     fun channels(c: Context) {
         if (Build.VERSION.SDK_INT < 26) return
@@ -87,7 +89,7 @@ object Notifs {
         if (at > System.currentTimeMillis()) exact(c, at, pi)
     }
 
-    /** json : [{ id, h, m, days: [0 = dimanche … 6], t, b }] */
+    /** json : [{ id, h, m, days: [0 = dimanche … 6], t, b }] ou [{ id, at: millisecondes, t, b }] (une seule fois) */
     fun setReminders(c: Context, json: String) {
         c.getSharedPreferences("mcs", Context.MODE_PRIVATE).edit().putString("rappels", json).apply()
         scheduleReminders(c)
@@ -95,7 +97,7 @@ object Notifs {
 
     fun scheduleReminders(c: Context) {
         val am = c.getSystemService(AlarmManager::class.java) ?: return
-        for (k in 0..15) am.cancel(alarmIntent(c, 200 + k, ACT_REMIND, "", ""))
+        for (k in 0 until MAX_REMIND) am.cancel(alarmIntent(c, 200 + k, ACT_REMIND, "", ""))
         val arr = try {
             JSONArray(c.getSharedPreferences("mcs", Context.MODE_PRIVATE).getString("rappels", "[]") ?: "[]")
         } catch (e: Exception) {
@@ -104,7 +106,12 @@ object Notifs {
         val now = System.currentTimeMillis()
         for (n in 0 until arr.length()) {
             val r = arr.optJSONObject(n) ?: continue
-            val id = r.optInt("id", n).coerceIn(0, 15)
+            val id = r.optInt("id", n).coerceIn(0, MAX_REMIND - 1)
+            val at = r.optLong("at", 0L)
+            if (at > 0L) {
+                if (at > now + 30000) exact(c, at, alarmIntent(c, 200 + id, ACT_REMIND, r.optString("t"), r.optString("b")))
+                continue
+            }
             val days = r.optJSONArray("days") ?: continue
             val set = HashSet<Int>()
             for (k in 0 until days.length()) set.add(days.optInt(k))

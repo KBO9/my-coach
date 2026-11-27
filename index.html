@@ -273,6 +273,9 @@ html[data-theme=light] .chip.y{color:#B38600}
 .toast.show{transform:translate(-50%,0)}
 .toast span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .toast .ico{font-size:19px;color:var(--c,var(--green));stroke-width:2.3}
+.toast.long{white-space:normal;width:calc(100% - 32px);padding:10px 18px 10px 14px;line-height:1.3;font-size:14px}
+.toast.long span{overflow:visible}
+.toast.long .ico{flex-shrink:0}
 .island{position:fixed;z-index:500;top:calc(var(--safe-t) + 6px);left:50%;width:136px;height:38px;margin-left:-68px;border-radius:19px;background:#000;color:#fff;overflow:hidden;box-shadow:0 12px 34px rgba(0,0,0,.4),inset 0 0 0 .5px rgba(255,255,255,.12);transform:translateY(-70px) scale(.5);opacity:0;transition:width .55s var(--spring),height .55s var(--spring),margin .55s var(--spring),border-radius .55s var(--spring),transform .55s var(--spring),opacity .3s;cursor:pointer}
 .island.show{transform:none;opacity:1}
 html.sheet-open .island{top:calc(var(--safe-t) + 70px)}
@@ -731,6 +734,18 @@ body:has(#ob) .toast{z-index:900}
 #cfx{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:700}
 @media (min-width:560px){body{background:#000}#main{box-shadow:0 0 0 .5px rgba(255,255,255,.08)}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition-duration:.01ms!important}}
+/* mon planning */
+.hero .pln{margin-top:9px;font-size:13px;font-weight:600;color:var(--c);max-width:64%;line-height:1.3}
+.wstrip.pl .wd .l::after{content:'';display:block;width:12px;height:2px;border-radius:1px;margin:2px auto 0;background:transparent}
+.wstrip.pl .wd.wk .l{color:#B4709F}
+.wstrip.pl .wd.wk .l::after{background:#B4709F}
+.tli.work>.dot{border-color:#B4709F;background:#B4709F}
+.tli.bed>.dot{border-color:#7D7AFF;background:#7D7AFF}
+.trn.wk{background:rgba(180,112,159,.13);color:#B4709F}
+.trn.bd{background:rgba(125,122,255,.12);color:#7D7AFF}
+[data-theme=light] .trn.wk,[data-theme=light] .wstrip.pl .wd.wk .l{color:#8A4A75}
+[data-theme=light] .wstrip.pl .wd.wk .l::after,[data-theme=light] .tli.work>.dot{background:#8A4A75;border-color:#8A4A75}
+[data-theme=light] .trn.bd{color:#5856D6}
 </style>
 </head>
 <body>
@@ -1209,9 +1224,9 @@ function defaults() {
   return {
     v: 3, onboarded: false,
     profile: { name: '', height: 175, startWeight: 90, goal: 80, startDate: t, weeks: 12, birth: '', sex: 'm' },
-    settings: { mode: 'fixed', trainTime: 'soir', bedtime: '23:30', restAuto: true, sound: true, haptics: true, keepAwake: true, theme: 'auto', optSupps: false, waterGoal: 10, glass: 250, remindTrain: '18:00', remindWeigh: '07:30', voice: true, voiceNames: true, voiceCheer: true, voiceMix: false, notifs: true, stepGoal: 8000 },
+    settings: { mode: 'fixed', trainTime: 'soir', bedtime: '23:30', restAuto: true, sound: true, haptics: true, keepAwake: true, theme: 'auto', optSupps: false, waterGoal: 10, glass: 250, remindTrain: '18:00', remindWeigh: '07:30', voice: true, voiceNames: true, voiceCheer: true, voiceMix: false, notifs: true, stepGoal: 8000, remindBed: true },
     weights: [], measures: [], days: {}, sessions: [], active: null, awards: {}, cheats: [], shop: {}, fastLog: [], rot: 0,
-    prog: {}, customEx: {}, steps: {}, coach: { adj: 0, log: [], snooze: '' }, savedAt: 0
+    prog: {}, customEx: {}, steps: {}, coach: { adj: 0, log: [], snooze: '' }, plan: { sig: null, at: 0 }, savedAt: 0
   };
 }
 function migrateOld(s) {
@@ -1274,10 +1289,11 @@ function sessionsOn(k) { return S.sessions.filter(s => s.date === k); }
 function planFor(k) {
   k = k || dkey();
   const t = dkey();
-  if (S.settings.mode === 'rotation') {
+  if (S.settings.mode === 'rotation' || S.settings.mode === 'planning') {
     const done = sessionsOn(k)[0];
     if (done) return SESS[done.tpl] || SESS.repos;
     if (k < t) return SESS.repos;
+    if (S.settings.mode === 'planning') return plSession(k); // voir MON PLANNING
     if (k === t) return S.active ? SESS[S.active.tpl] : SESS[ROT[S.rot % ROT.length]];
     const off = diffDays(t, k) - (sessionsOn(t).length ? 1 : 0);
     return SESS[ROT[(S.rot + Math.max(0, off)) % ROT.length]];
@@ -1824,12 +1840,13 @@ function confetti() {
 
 /* ---------- toast ---------- */
 let toastT = null;
-function toast(msg, icon, color) {
+function toast(msg, icon, color, ms) {
   const t = $('#toast');
   t.innerHTML = ic(icon || 'check') + '<span>' + esc(msg) + '</span>';
   t.style.setProperty('--c', color || 'var(--green)');
+  t.classList.toggle('long', (ms || 0) > 2300);
   t.classList.add('show');
-  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2300);
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms || 2300);
 }
 
 /* ---------- feuilles modales (sheets) ---------- */
@@ -1962,7 +1979,7 @@ function vToday() {
     '<div class="rl"><div class="k">Séance</div><div class="v" style="color:#FF375F">' + s1 + '</div></div>' +
     '<div class="rl"><div class="k">Protéines</div><div class="v" style="color:#30D158">' + num(e.p, 0) + '<small>/' + DIET.p + ' G</small></div></div>' +
     '<div class="rl"><div class="k">Habitudes</div><div class="v" style="color:#0A84FF">' + hDone + '<small>/' + HABITS.length + '</small></div></div></div></div>';
-  h += '<div class="sec"><h2>Séance du jour</h2><button class="lnk" data-act="go" data-tab="train">Programme</button></div>';
+  h += '<div class="sec"><h2>Séance du jour</h2>' + (S.settings.mode === 'planning' ? '<button class="lnk" data-act="weekPlan">Mes 2 semaines</button>' : '<button class="lnk" data-act="go" data-tab="train">Programme</button>') + '</div>';
   h += heroCard(k) + weekStrip();
   h += '<div class="grid2">' + fastTile() + weightTile() + '</div>';
   h += '<div class="card"><div class="ch">' + ic('sparkle') + 'Habitudes du jour<span class="r">' + hDone + ' sur ' + HABITS.length + '</span></div><div class="hab">' + HABITS.map(habBtn).join('') + '</div></div>';
@@ -1975,6 +1992,11 @@ function heroCard(k) {
   const act = S.active;
   const eb = (w > 0 ? 'Semaine ' + w + ' · ' : '') + JOURS[d.getDay()];
   if (p.kind === 'rest' && !done && !(act && act.date === k)) {
+    if (S.settings.mode === 'planning') {
+      const nt = plNextTrain(k);
+      return '<div class="hero" style="' + cs(SESS.repos) + ';--c:#8E8E93"><div class="bm">' + bodySVG([], '#8E8E93') + '</div><div class="eb">' + eb + '</div><div class="tt">Récupération</div><div class="mt">Marche légère, étirements doux et une vraie nuit de sommeil.</div><div class="pln">' + esc(plHeroLine(k)) + '</div>' +
+        (nt ? '<div class="cta"><button class="btn btn-s btn-f" data-act="sessionDetail" data-id="' + nt.s.id + '">' + cap(plDayName(nt.k)) + ' : ' + nt.s.name + ic('chev') + '</button></div>' : '') + '</div>';
+    }
     const tm = planFor(addDays(k, 1));
     return '<div class="hero" style="' + cs(SESS.repos) + ';--c:#8E8E93"><div class="bm">' + bodySVG([], '#8E8E93') + '</div><div class="eb">' + eb + '</div><div class="tt">Récupération</div><div class="mt">Marche légère, étirements doux et une vraie nuit de sommeil : c’est au repos que le muscle se construit.</div>' +
       '<div class="cta"><button class="btn btn-s btn-f" data-act="sessionDetail" data-id="' + tm.id + '">Demain : ' + tm.name + ic('chev') + '</button></div></div>';
@@ -1989,14 +2011,14 @@ function heroCard(k) {
   } else {
     cta = '<div class="cta"><button class="btn btn-c" data-act="startSession" data-id="' + s.id + '">' + ic('play') + 'Commencer</button><button class="btn btn-s btn-f" data-act="sessionDetail" data-id="' + s.id + '">Détails</button></div>';
   }
-  return '<div class="hero" style="' + cs(s) + '"><div class="bm">' + bodySVG(s.muscles, s.color) + '</div><div class="eb">' + eb + '</div><div class="tt">' + s.name + '</div><div class="mt">' + s.ex.length + ' exercices · ' + s.nsets + ' séries<br>≈ ' + s.est + NB + 'min</div>' + cta + '</div>';
+  return '<div class="hero" style="' + cs(s) + '"><div class="bm">' + bodySVG(s.muscles, s.color) + '</div><div class="eb">' + eb + '</div><div class="tt">' + s.name + '</div><div class="mt">' + s.ex.length + ' exercices · ' + s.nsets + ' séries<br>≈ ' + s.est + NB + 'min</div>' + (S.settings.mode === 'planning' && !done ? '<div class="pln">' + esc(plHeroLine(k)) + '</div>' : '') + cta + '</div>';
 }
 function weekStrip() {
-  const t = dkey(), mon = weekMon(t);
-  let h = '<div class="wstrip">';
+  const t = dkey(), mon = weekMon(t), PLM = S.settings.mode === 'planning';
+  let h = '<div class="wstrip' + (PLM ? ' pl' : '') + '">';
   for (let i = 0; i < 7; i++) {
     const k = addDays(mon, i), p = planFor(k), done = sessionsOn(k).some(x => isTrain(SESS[x.tpl]));
-    h += '<button class="wd' + (k === t ? ' today' : '') + (done ? ' done' : '') + (p.kind === 'rest' ? ' rest' : '') + '" style="--c:' + p.color + '" data-act="dayPeek" data-k="' + k + '" aria-label="' + JOURS[parseD(k).getDay()] + ' : ' + p.name + '"><span class="l">' + JOURS_C[parseD(k).getDay()].charAt(0) + '</span><span class="n">' + parseD(k).getDate() + '</span><span class="dt"></span></button>';
+    h += '<button class="wd' + (k === t ? ' today' : '') + (done ? ' done' : '') + (p.kind === 'rest' ? ' rest' : '') + (PLM && wkFor(k).d.work ? ' wk' : '') + '" style="--c:' + p.color + '" data-act="dayPeek" data-k="' + k + '" aria-label="' + JOURS[parseD(k).getDay()] + ' : ' + p.name + (PLM && wkFor(k).d.work ? ', service à ' + wkFor(k).d.s : '') + '"><span class="l">' + JOURS_C[parseD(k).getDay()].charAt(0) + '</span><span class="n">' + parseD(k).getDate() + '</span><span class="dt"></span></button>';
   }
   return h + '</div>';
 }
@@ -2045,6 +2067,7 @@ function santeCard() {
     '<div data-act="stepsSheet"><div class="k">Pas aujourd’hui</div><div class="big" style="color:#30D158">' + (steps != null ? num(steps) : '—') + '</div><div class="bar" style="--c:#30D158;margin-top:7px"><i style="' + barW('steps', (steps || 0) / stepGoal()) + '"></i></div></div></div>';
   if (n && n.st) h += stageBar(n);
   if (a7) h += '<div class="tiny" style="margin-top:10px">Moyenne sur 7 nuits : <b style="color:var(--t1)">' + hmin(a7) + '</b> · objectif 7 h</div>';
+  if (S.settings.mode === 'planning' && plBedTip(t)) h += '<div class="tiny" style="margin-top:6px;color:#7D7AFF;font-weight:600">' + esc(plBedTip(t)) + '</div>';
   return h + '</div>';
 }
 function streakCard() {
@@ -2066,12 +2089,12 @@ function tipCard() {
 /* ---------------- ENTRAÎNEMENT ---------------- */
 function vTrain() {
   const t = dkey(), w = weekNo(t), W = S.profile.weeks;
-  const n = weekSessions(t);
+  const n = weekSessions(t), tg = S.settings.mode === 'planning' ? Math.max(1, plWeekTarget(t)) : 6;
   let h = lt(w > 0 ? 'Semaine ' + w + (w <= W ? ' sur ' + W : '') : 'Programme', 'Entraînement', '<button class="cbtn" data-act="timer" aria-label="Minuteur">' + ic('timer') + '</button>' + avatarBtn());
-  h += '<div class="card"><div class="ch">' + ic('cal') + 'Cette semaine<span class="r">' + n + ' / 6 séances</span></div><div class="prog-line"><div class="bar" style="--c:var(--accent)"><i style="' + barW('wkp', n / 6) + '"></i></div></div>' +
+  h += '<div class="card"><div class="ch">' + ic('cal') + 'Cette semaine<span class="r">' + n + ' / ' + tg + ' séances</span></div><div class="prog-line"><div class="bar" style="--c:var(--accent)"><i style="' + barW('wkp', n / tg) + '"></i></div></div>' +
     '<div class="tiny" style="margin-top:10px">' + (W && w > 0 ? 'Programme de ' + W + ' semaines · ' + (w <= W ? 'encore ' + plural(W - w + 1, 'semaine') : 'objectif dépassé, continue !') : '') + '</div></div>';
   h += weekStrip();
-  h += '<div class="sec"><h2>Musculation</h2><span class="sub">' + (S.settings.mode === 'rotation' ? 'Mode rotation' : 'Programme du coach') + '</span></div>';
+  h += '<div class="sec"><h2>Musculation</h2><span class="sub">' + (S.settings.mode === 'rotation' ? 'Mode rotation' : S.settings.mode === 'planning' ? 'Selon ton planning' : 'Programme du coach') + '</span></div>';
   TRAIN_ORDER.filter(id => SESS[id].kind === 'muscu').forEach(id => { h += sessionCard(SESS[id]); });
   h += '<div class="sec"><h2>Cardio</h2><span class="sub">Sans impact pour le dos</span></div>';
   TRAIN_ORDER.filter(id => SESS[id].kind === 'cardio').forEach(id => { h += sessionCard(SESS[id]); });
@@ -2092,7 +2115,7 @@ function sessionCard(s) {
 }
 
 /* ---------------- NUTRITION ---------------- */
-function todayTT(k) { const r = day(k); return r.tt || (planFor(k).kind === 'rest' ? 'off' : S.settings.trainTime); }
+function todayTT(k) { const r = day(k); if (r.tt) return r.tt; if (S.settings.mode === 'planning') return wkFor(k || dkey()).tt; return planFor(k).kind === 'rest' ? 'off' : S.settings.trainTime; }
 function timelineItems(tt) {
   const din = dinnerTime();
   if (tt === 'matin') return [{ tr: 1, t: 'Le matin' }, { m: 'snack', t: '1 h après l’entraînement' }, { m: 'dej', t: 'Entre 12:00 et 15:00' }, { m: 'din', t: 'Vers ' + din + ' · 1 h 30 à 2 h avant de dormir' }];
@@ -2110,7 +2133,9 @@ function vFood() {
   const tt = todayTT(k), p = planFor(k);
   h += '<div class="sec"><h2>Repas du jour</h2><span class="sub">Je m’entraîne…</span></div>';
   h += seg('tt', [['matin', 'Matin'], ['aprem', 'Après-midi'], ['soir', 'Soir'], ['off', 'Repos']], tt);
-  h += '<div class="tl">' + timelineItems(tt).map(it => {
+  h += '<div class="tl">' + (S.settings.mode === 'planning' ? plTimeline(k, tt) : timelineItems(tt)).map(it => {
+    if (it.wk) return '<div class="tli work"><span class="dot"></span><div class="trn wk">' + ic('cal') + '<div>' + esc(it.t) + '<small>' + esc(it.sub) + '</small></div></div></div>';
+    if (it.bd) return '<div class="tli bed"><span class="dot"></span><div class="trn bd">' + ic('bed') + '<div>' + esc(it.t) + '<small>' + esc(it.sub) + '</small></div></div></div>';
     if (it.tr) return '<div class="tli train"><span class="dot"></span><div class="trn">' + ic('dumbbell') + '<div>Entraînement · ' + it.t.toLowerCase() + '<small>' + (isTrain(p) ? p.name : 'Séance du jour') + '</small></div></div></div>';
     return mealCard(k, MEALS.find(m => m.id === it.m), it.t);
   }).join('') + '</div>';
@@ -2706,7 +2731,7 @@ function finishWorkout() {
   const vol = ex.reduce((t, e) => t + (EXI[e.id].mode ? 0 : e.sets.reduce((b, x) => b + x.w * x.r, 0)), 0);
   const sess = { id: a.id, tpl: a.tpl, kind: s.kind, date: a.date, start: a.start, end: end, dur: Math.round((end - a.start) / 1000), ex: ex, vol: Math.round(vol), nsets: ex.reduce((n, e) => n + e.sets.length, 0), prs: prs, warm: !!a.warm.done };
   S.sessions.push(sess);
-  if (S.settings.mode === 'rotation') advanceRot(a.tpl);
+  if (S.settings.mode !== 'fixed') advanceRot(a.tpl);
   S.active = null; save(true);
   stopRest(); keepAwake(false);
   closeAll(); renderMini(); refresh();
@@ -3074,8 +3099,10 @@ function settingsHTML() {
   h += '<div style="display:flex;flex-direction:column;align-items:center;padding:4px 20px 18px"><div class="avatar" style="width:78px;height:78px;font-size:32px">' + (P.name ? esc(P.name.charAt(0).toUpperCase()) : '<span style="font-size:38px;display:grid">' + ic('person') + '</span>') + '</div><div style="font-size:22px;font-weight:700;letter-spacing:-.025em;margin-top:10px">' + (P.name ? esc(P.name) : 'Ton profil') + '</div><div class="tiny" style="margin-top:2px">' + (weekNo() > 0 ? 'Semaine ' + weekNo() + ' · ' : '') + 'objectif ' + num(P.goal) + NB + 'kg</div></div>';
   h += '<div class="lhd">Profil</div><div class="list">' + fieldRow('Prénom', 'text', 'profile.name', P.name, 'Facultatif') + fieldRow('Taille', 'num', 'profile.height', P.height, 'cm') + fieldRow('Date de naissance', 'date', 'profile.birth', P.birth) + fieldRow('Poids de départ', 'num', 'profile.startWeight', P.startWeight, 'kg') + fieldRow('Poids visé', 'num', 'profile.goal', P.goal, 'kg') + '</div>' + seg('sex', [['m', 'Homme'], ['f', 'Femme']], P.sex === 'f' ? 'f' : 'm') + '<div class="foot" style="margin-top:-4px">Âge et sexe servent à calculer ta dépense d’énergie et ta zone cardio.</div>';
   h += '<div class="lhd">Programme</div><div class="list">' + fieldRow('Début', 'date', 'profile.startDate', P.startDate) + fieldRow('Durée', 'num', 'profile.weeks', P.weeks, 'sem.') + '</div>';
-  h += '<div class="lhd">Planning</div>' + seg('mode', [['fixed', 'Jours du coach'], ['rotation', 'Rotation']], T.mode) + '<div class="foot" style="margin-top:-4px">' + (T.mode === 'fixed' ? 'Dim jambes · Lun pec · Mar dos · Mer cardio · Jeu épaules · Ven cardio · Sam repos.' : 'La séance suivante vient quand tu as terminé la précédente : pratique si tes horaires de travail changent.') + '</div>';
-  h += '<div class="lhd">Je m’entraîne plutôt le</div>' + seg('train', [['matin', 'Matin'], ['aprem', 'Après-midi'], ['soir', 'Soir']], T.trainTime) + '<div class="list">' + fieldRow('Heure du coucher', 'time', 'settings.bedtime', T.bedtime) + '</div><div class="foot">Ton planning de repas suit les consignes du coach selon l’heure de ta séance, et le dîner se cale 1 h 30 à 2 h avant de dormir.</div>';
+  const PLM = T.mode === 'planning';
+  h += '<div class="lhd">Planning</div>' + seg('mode', [['planning', 'Mon planning'], ['fixed', 'Jours du coach'], ['rotation', 'Rotation']], T.mode) + '<div class="foot" style="margin-top:-4px">' + (PLM ? 'Tes séances suivent ton appli Planning : autour de tes horaires de service, avec un jour de repos par bloc de travail.' : T.mode === 'fixed' ? 'Dim jambes · Lun pec · Mar dos · Mer cardio · Jeu épaules · Ven cardio · Sam repos.' : 'La séance suivante vient quand tu as terminé la précédente : pratique si tes horaires de travail changent.') + '</div>';
+  if (PLM) h += plSettingsHTML();
+  h += '<div class="lhd">' + (PLM ? 'Les jours OFF, je m’entraîne plutôt le' : 'Je m’entraîne plutôt le') + '</div>' + seg('train', [['matin', 'Matin'], ['aprem', 'Après-midi'], ['soir', 'Soir']], T.trainTime) + '<div class="list">' + fieldRow(PLM ? 'Coucher habituel' : 'Heure du coucher', 'time', 'settings.bedtime', T.bedtime) + '</div><div class="foot">' + (PLM ? 'Tes repas suivent les consignes du coach selon l’heure de ta séance et de ton service. Avant un service tôt, ton coucher avance pour garder 7 h de sommeil ; après un service tard, le dîner se prend en rentrant.' : 'Ton planning de repas suit les consignes du coach selon l’heure de ta séance, et le dîner se cale 1 h 30 à 2 h avant de dormir.') + '</div>';
   h += '<div class="lhd">Séance</div><div class="list">' + swRow('Repos automatique', 'restAuto', 'Lance le chrono à chaque série validée') + swRow('Sons', 'sound') + swRow('Vibrations', 'haptics') + swRow('Garder l’écran allumé', 'keepAwake') + '</div>';
   h += '<div class="lhd">Voix du coach</div><div class="list">' + swRow('Voix du coach', 'voice', 'Repos, séries, minuteurs, même écran verrouillé') +
     (T.voice && NAT_TTS ? (function () { const d = natVoices(), vs = (d && d.voices) || [], ci = vs.findIndex(v => v.cur); return row('speaker', '#5E5CE6', 'Voix', ci >= 0 ? natVoiceLabel(vs[ci], ci) + (vs[ci].net ? ' · en ligne' : '') : (d && d.ready ? 'Choisis une voix française' : 'Synthèse vocale d’Android'), 'voicePick'); })() : '') +
@@ -3084,7 +3111,8 @@ function settingsHTML() {
     '<div class="foot">' + (T.voice && NAT_TTS ? 'Voix naturelle d’Android : elle parle écran verrouillé, et ta musique baisse le temps de la phrase au lieu de s’arrêter.' : T.voice ? (T.voiceMix ? 'La voix se mélange à ta musique tant que l’écran est allumé.' : 'La voix est préparée comme une piste audio : elle continue écran verrouillé, écouteurs branchés. Pendant un repos ou un minuteur, une musique lancée depuis une autre appli se met en pause.') : 'Une voix d’homme grave annonce tes repos, tes séries et les phases de tes minuteurs.') + '</div>';
   h += '<div class="lhd">Nutrition</div><div class="list"><div class="row"><div class="rt"><div class="t1">Objectif d’eau</div><div class="t2">' + T.waterGoal + ' verres de ' + (T.glass / 10) + ' cl</div></div><div class="stepper"><button data-act="waterGoal" data-d="-1" aria-label="Moins">' + ic('minus') + '</button><span class="sv">' + num(T.waterGoal * T.glass / 1000, 1) + NB + 'L</span><button data-act="waterGoal" data-d="1" aria-label="Plus">' + ic('plus') + '</button></div></div>' + swRow('Compléments optionnels', 'optSupps', 'Multivitamines, D3-K2, vitamine C') + '</div>';
   h += '<div class="lhd">Apparence</div>' + seg('theme', [['auto', 'Automatique'], ['light', 'Clair'], ['dark', 'Sombre']], T.theme);
-  if (NATIVE) h += '<div class="lhd">Rappels</div><div class="list">' + swRow('Notifications de rappel', 'notifs', 'Séance et pesée, à l’heure choisie') + fieldRow('Séance', 'time', 'settings.remindTrain', T.remindTrain) + fieldRow('Pesée', 'time', 'settings.remindWeigh', T.remindWeigh) + '</div><div class="foot">À la fin de chaque repos, une notification « C’est reparti » s’affiche aussi quand le téléphone est verrouillé.</div>';
+  if (NATIVE && PLM) h += '<div class="lhd">Rappels</div><div class="list">' + swRow('Notifications de rappel', 'notifs', 'Séance, pesée et coucher, selon ton planning') + swRow('Rappel du coucher', 'remindBed', 'La veille d’un service tôt') + fieldRow('Pesée les autres jours', 'time', 'settings.remindWeigh', T.remindWeigh) + '</div><div class="foot">Séance : 30 min avant l’heure conseillée. Pesée : au réveil les jours de service tôt. ' + (NAT_PL ? 'Rappels prévus sur 14 jours et recalculés à chaque changement de ton planning.' : 'Mets à jour l’appli Android pour des rappels au jour près.') + '</div>';
+  else if (NATIVE) h += '<div class="lhd">Rappels</div><div class="list">' + swRow('Notifications de rappel', 'notifs', 'Séance et pesée, à l’heure choisie') + fieldRow('Séance', 'time', 'settings.remindTrain', T.remindTrain) + fieldRow('Pesée', 'time', 'settings.remindWeigh', T.remindWeigh) + '</div><div class="foot">À la fin de chaque repos, une notification « C’est reparti » s’affiche aussi quand le téléphone est verrouillé.</div>';
   else h += '<div class="lhd">Rappels</div><div class="list">' + fieldRow('Séance', 'time', 'settings.remindTrain', T.remindTrain) + fieldRow('Pesée', 'time', 'settings.remindWeigh', T.remindWeigh) + '<div class="row tap" data-act="ics"><span class="tile" style="--c:#FF453A">' + ic('bell') + '</span><div class="rt"><div class="t1" style="color:var(--blue)">Ajouter à mon calendrier</div></div></div></div><div class="foot">Les rappels sont créés dans le calendrier de ton téléphone : ils sonnent même quand l’app est fermée.</div>';
   if (NATIVE) {
     const hs = natHealthStatus() || {};
@@ -3111,7 +3139,7 @@ function settingsHTML() {
     row('up', '#30D158', 'Importer un fichier', 'Remplace les données actuelles', 'import') +
     '<div class="row tap" data-act="resetAsk"><span class="tile" style="--c:#FF453A">' + ic('trash') + '</span><div class="rt"><div class="t1" style="color:var(--red)">Tout réinitialiser</div></div></div></div>';
   h += '<div class="foot">' + (PERSIST === true ? 'Stockage protégé : le téléphone ne supprimera pas tes données pour faire de la place. ' : '') + 'Une copie de secours est aussi gardée dans l’app' + (CLOUD.token ? ', et tout part sur ton GitHub privé.' : '. Active la sauvegarde cloud pour ne rien perdre si tu changes de téléphone.') + '</div>';
-  h += '<div class="foot" style="text-align:center;padding-top:8px">My Coach 3.1</div></div>';
+  h += '<div class="foot" style="text-align:center;padding-top:8px">My Coach 3.4</div></div>';
   return h;
 }
 function setSetting(path, val, type) {
@@ -3123,7 +3151,7 @@ function setSetting(path, val, type) {
   else if (k === 'name') obj[k] = String(val).trim().slice(0, 24);
   else obj[k] = val;
   save(); refresh(); rerenderSheet('settings');
-  if (k === 'remindTrain' || k === 'remindWeigh') natReminders();
+  if (k === 'remindTrain' || k === 'remindWeigh' || k === 'bedtime') natReminders();
 }
 
 /* ---------- rappels (.ics pour le calendrier du téléphone) ---------- */
@@ -3137,11 +3165,12 @@ function makeICS() {
   if (T.mode === 'fixed') {
     ev.push({ id: 'muscu', s: 'My Coach · Musculation', d0: nextDayIn([0, 1, 2, 4]), r: 'FREQ=WEEKLY;BYDAY=SU,MO,TU,TH', t: T.remindTrain, dur: 'PT1H15M', a: '-PT15M', desc: 'Échauffement, paliers, puis tes séries. Ouvre My Coach.' });
     ev.push({ id: 'cardio', s: 'My Coach · Cardio', d0: nextDayIn([3, 5]), r: 'FREQ=WEEKLY;BYDAY=WE,FR', t: T.remindTrain, dur: 'PT50M', a: '-PT15M', desc: 'Cardio sans impact : zone 2 et gainage, ou fractionné et mobilité.' });
-  } else ev.push({ id: 'seance', s: 'My Coach · Séance du jour', d0: dkey(), r: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR,SU', t: T.remindTrain, dur: 'PT1H', a: '-PT15M', desc: 'Ta prochaine séance t’attend dans My Coach.' });
+  } else if (T.mode === 'planning') plIcsEvents().forEach(e => ev.push(e));
+  else ev.push({ id: 'seance', s: 'My Coach · Séance du jour', d0: dkey(), r: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR,SU', t: T.remindTrain, dur: 'PT1H', a: '-PT15M', desc: 'Ta prochaine séance t’attend dans My Coach.' });
   ev.push({ id: 'pesee', s: 'My Coach · Pesée', d0: dkey(), r: 'FREQ=DAILY', t: T.remindWeigh, dur: 'PT5M', a: 'PT0S', desc: 'À jeun, après être passé aux toilettes.' });
   let s = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//My Coach//FR\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\n';
   ev.forEach(e => {
-    s += 'BEGIN:VEVENT\r\nUID:my-coach-' + e.id + '-' + e.d0 + '@my-coach\r\nDTSTAMP:' + stamp + '\r\nDTSTART:' + f(e.d0, e.t) + '\r\nDURATION:' + e.dur + '\r\nRRULE:' + e.r + '\r\nSUMMARY:' + e.s + '\r\nDESCRIPTION:' + e.desc + '\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:' + e.s + '\r\nTRIGGER:' + e.a + '\r\nEND:VALARM\r\nEND:VEVENT\r\n';
+    s += 'BEGIN:VEVENT\r\nUID:my-coach-' + e.id + '-' + e.d0 + '@my-coach\r\nDTSTAMP:' + stamp + '\r\nDTSTART:' + f(e.d0, e.t) + '\r\nDURATION:' + e.dur + '\r\n' + (e.r ? 'RRULE:' + e.r + '\r\n' : '') + 'SUMMARY:' + e.s + '\r\nDESCRIPTION:' + e.desc + '\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:' + e.s + '\r\nTRIGGER:' + e.a + '\r\nEND:VALARM\r\nEND:VEVENT\r\n';
   });
   return s + 'END:VCALENDAR\r\n';
 }
@@ -3262,7 +3291,7 @@ function dayHTML(k) {
   return h + '</div></div>';
 }
 function daySheetRest() {
-  openSheet({ id: 'restinfo', cls: 'float', html: shHead('Repos') + '<div class="sh-body" style="padding:0 20px 24px"><div style="display:flex;justify-content:center;margin:6px 0 16px"><span class="tile lg" style="--c:#5E5CE6;width:64px;height:64px;border-radius:20px;font-size:32px">' + ic('moon') + '</span></div><p class="muted" style="font-size:16px;line-height:1.5;text-align:center">Le samedi, on récupère : marche légère, étirements doux, sommeil. C’est pendant le repos que le muscle se reconstruit. Garde ta diète et tes habitudes.</p></div>' });
+  openSheet({ id: 'restinfo', cls: 'float', html: shHead('Repos') + '<div class="sh-body" style="padding:0 20px 24px"><div style="display:flex;justify-content:center;margin:6px 0 16px"><span class="tile lg" style="--c:#5E5CE6;width:64px;height:64px;border-radius:20px;font-size:32px">' + ic('moon') + '</span></div><p class="muted" style="font-size:16px;line-height:1.5;text-align:center">' + (S.settings.mode === 'fixed' ? 'Le samedi, on récupère' : 'Jour de récupération') + ' : marche légère, étirements doux, sommeil. C’est pendant le repos que le muscle se reconstruit. Garde ta diète et tes habitudes.</p></div>' });
 }
 function ringsInfo() {
   openSheet({ id: 'rinfo', cls: 'float', html: shHead('Tes trois anneaux') + '<div class="sh-body"><div class="list ic">' +
@@ -3514,6 +3543,7 @@ function applyState(o, msg) {
   if (!isEmptyState(o)) o.onboarded = true;
   S = o;
   registerCustom(); applyProgram(); applyDietAdj();
+  if (typeof plAfterState === 'function') plAfterState();
   save(true); mirrorNow();
   try { stopRest(); vxStop(); } catch (e) { /* ignore */ }
   closeAll(); applyTheme(); renderMini(); render(TAB, true);
@@ -4198,7 +4228,8 @@ function natCloudImport() {
 function natReminders() {
   if (!NATIVE) return;
   const T = S.settings, R = [];
-  if (T.notifs !== false) {
+  if (T.notifs !== false && T.mode === 'planning') plReminders().forEach(r => R.push(r)); // voir MON PLANNING
+  else if (T.notifs !== false) {
     const tp = String(T.remindTrain || '18:00').split(':'), wp = String(T.remindWeigh || '07:30').split(':');
     if (T.mode === 'fixed') {
       for (let d = 0; d < 7; d++) { const s = SESS[SCHED[d]]; if (isTrain(s)) R.push({ id: d, h: +tp[0], m: +tp[1], days: [d], t: 'Séance du jour : ' + s.name, b: plural(s.ex.length, 'exercice') + ' · environ ' + s.est + ' min. L’échauffement d’abord !' }); }
@@ -4511,6 +4542,413 @@ function scienceHTML() {
 }
 
 /* =========================================================
+   MON PLANNING : My Coach suit ton appli Planning
+   Les deux applis vivent sur le même site (kbo9.github.io) : My Coach lit
+   directement le planning enregistré par Planning (clé dcrm10) et se
+   recalcule à chaque changement. Sans données, il suit le cycle 4/2.
+   ========================================================= */
+const PL_KEY = 'dcrm10';
+const PL_ANC = Date.UTC(2026, 3, 5); // début du cycle dans Planning (5 avril 2026)
+const PL_SHC = [['09:00', '16:30'], ['15:30', '23:00'], ['05:00', '12:30'], ['16:00', '23:30'], ['06:00', '13:30'], ['05:30', '13:00']];
+const PL_TT = { matin: '10:00', aprem: '15:00', soir: '18:30' };
+const PL_LAB = { rps: 'OFF', cp: 'Congé payé', conge: 'Congé', css: 'Congé sans solde' };
+const PL = { raw: undefined, data: null, sig: '-', hol: {}, wk: null, wkKey: '' };
+let PL_WIN = { t: '', keys: [] };
+const NAT_PL = NATIVE && typeof window.MCNative.openPlanning === 'function'; // appli Android ≥ 2.4
+
+function plMin(t) { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? +m[1] * 60 + +m[2] : null; }
+function plHM(m) { m = ((Math.round(m) % 1440) + 1440) % 1440; return pad(Math.floor(m / 60)) + ':' + pad(m % 60); }
+function plQ(m, up) { return (up ? Math.ceil(m / 15) : Math.floor(m / 15)) * 15; }
+function plAt(k, m) { const d = parseD(k); return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, m).getTime(); }
+function plDayName(k) {
+  const t = dkey();
+  if (k === t) return 'aujourd’hui';
+  if (k === addDays(t, 1)) return 'demain';
+  return JOURS[parseD(k).getDay()] + ' ' + parseD(k).getDate();
+}
+
+/* jours fériés (Pâques : algorithme de Meeus), comme dans Planning */
+function plHol(y) {
+  if (PL.hol[y]) return PL.hol[y];
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3),
+    h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451),
+    mo = Math.floor((h + l - 7 * m + 114) / 31), da = (h + l - 7 * m + 114) % 31 + 1;
+  const E = n => dkey(new Date(y, mo - 1, da + n)), o = {};
+  o[y + '-01-01'] = 'Jour de l’An'; o[E(1)] = 'Lundi de Pâques'; o[y + '-05-01'] = 'Fête du Travail'; o[y + '-05-08'] = 'Victoire 1945';
+  o[E(39)] = 'Ascension'; o[E(50)] = 'Lundi de Pentecôte'; o[y + '-07-14'] = 'Fête nationale'; o[y + '-08-15'] = 'Assomption';
+  o[y + '-11-01'] = 'Toussaint'; o[y + '-11-11'] = 'Armistice 1918'; o[y + '-12-25'] = 'Noël';
+  return (PL.hol[y] = o);
+}
+
+/* ---------- lecture du planning ---------- */
+function plRaw() { try { return localStorage.getItem(PL_KEY); } catch (e) { return null; } }
+function plParse(raw) {
+  if (!raw) return null;
+  try { const o = JSON.parse(raw); return o && o.days && typeof o.days === 'object' ? { days: o.days, set: o.set || {} } : null; } catch (e) { return null; }
+}
+function plHash(s) { let h = 0; for (let i = 0; i < s.length; i += 7) h = (h * 31 + s.charCodeAt(i)) | 0; return s.length + ':' + h; }
+/* relit le planning ; vrai s'il a changé depuis la dernière lecture */
+function plSync() {
+  const raw = plRaw();
+  if (raw === PL.raw) return false;
+  PL.raw = raw; PL.data = plParse(raw); PL.sig = raw ? plHash(raw) : '-'; PL.wk = null; PL.wkKey = '';
+  return true;
+}
+/* dernier jour rempli par Planning (au-delà, My Coach suit le même cycle) */
+function plHorizon() {
+  const D = PL.data; if (!D) return '';
+  if (D.hz) return D.hz;
+  let g = /^\d{4}-\d{2}-\d{2}$/.test(D.set.genTo || '') ? D.set.genTo : '2026-12-31';
+  if (!D.set.genTo) Object.keys(D.days).forEach(k => { const x = D.days[k]; if (x && x.gen && k > g) g = k; });
+  return (D.hz = g);
+}
+/* cycle 4/2 de Planning : 4 jours de service, 2 OFF, 6 grilles d'horaires qui tournent */
+function plCycle(k) {
+  const d = parseD(k), n = Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - PL_ANC) / 864e5);
+  const cd = ((n % 6) + 6) % 6, sh = PL_SHC[((Math.floor(n / 6) % 6) + 6) % 6], hol = plHol(d.getFullYear())[k];
+  if (cd <= 3) return hol ? { type: 'ferie', start: sh[0], end: sh[1] } : { type: 'work', start: sh[0], end: plHM(plMin(sh[1]) + [0, 15, 30, -15][cd]) };
+  return hol ? { type: 'ferie', start: '', end: '' } : { type: 'rps' };
+}
+/* une journée du planning, sous une forme simple */
+function plDay(k) {
+  if (PL.raw === undefined) plSync();
+  const D = PL.data;
+  let e = D ? D.days[k] : null, src = 'planning';
+  if (!e) {
+    if (D && k <= plHorizon()) e = { type: 'rps' }; // jour vide dans Planning : OFF
+    else { e = plCycle(k); src = 'cycle'; }
+  }
+  const ty = e.type || 'rps';
+  let s = e.start || e.pstart || '', en = e.end || e.pend || '';
+  const work = ty === 'work' || ty === 'renfort' || (ty === 'ferie' && !!(s && en));
+  if (work && (plMin(s) == null || plMin(en) == null)) { s = '06:00'; en = '13:30'; } // horaires manquants : valeurs par défaut de Planning
+  const hol = plHol(+k.slice(0, 4))[k] || '';
+  const lab = work ? (ty === 'renfort' ? 'Renfort' : ty === 'ferie' ? 'Férié travaillé' : 'Service') : (ty === 'ferie' ? (hol || 'Férié') : (PL_LAB[ty] || 'OFF'));
+  return { k: k, work: work, s: work ? s : '', e: work ? en : '', lab: lab, ty: ty, src: src, gen: !!e.gen || src === 'cycle' };
+}
+function plShiftTxt(d) { return d.work ? d.lab + ' ' + d.s + ' → ' + d.e : (d.lab === 'OFF' ? 'Jour OFF' : d.lab); }
+
+/* ---------- ta semaine, calculée depuis le planning ---------- */
+function plWin() {
+  const t = dkey();
+  if (PL_WIN.t !== t) { const a = []; for (let i = -12; i <= 45; i++) a.push(addDays(t, i)); PL_WIN = { t: t, keys: a }; }
+  return PL_WIN.keys;
+}
+function plKey() {
+  const T = S.settings, W = plWin();
+  let ov = '';
+  for (let i = 11; i < W.length; i++) { const r = S.days[W[i]]; if (r && r.tt) ov += i + r.tt; }
+  return W[12] + '|' + PL.sig + '|' + T.trainTime + '|' + T.bedtime + '|' + ov;
+}
+/*
+  Pour chaque jour : service, heure de séance conseillée, repos, coucher, réveil.
+  - après un service qui finit tôt : séance 2 h après la fin (repas et trajet)
+  - avant un service qui commence tard : séance 5 h avant (séance, repas, trajet)
+  - jour OFF : à l'heure que tu préfères (Réglages)
+  - 1 jour de repos par bloc d'au moins 3 jours de service : le moins pratique, sinon l'avant-dernier
+  - jamais plus de 6 jours d'entraînement d'affilée (comme le programme du coach)
+  - coucher : 8 h 30 avant un service qui commence avant 8 h (réveil 1 h 15 avant, 7 h 15 de nuit),
+    2 h après un service qui finit après 21 h (dîner juste après)
+*/
+function wkPlan() {
+  if (PL.raw === undefined) plSync();
+  const key = plKey();
+  if (PL.wk && PL.wkKey === key) return PL.wk;
+  const W = plWin(), T = S.settings, N = W.length;
+  const defTT = plMin(PL_TT[T.trainTime] || '18:30');
+  let defBed = plMin(T.bedtime || '23:30'); if (defBed == null) defBed = 1410; if (defBed < 720) defBed += 1440;
+  const days = W.map(plDay), bed = [], P = {};
+  for (let i = 0; i < N; i++) {
+    const d = days[i], nx = i + 1 < N ? days[i + 1] : plDay(addDays(W[i], 1));
+    let b = defBed, why = '';
+    if (d.work) { const s = plMin(d.s); let e = plMin(d.e); if (e <= s) e += 1440; if (e >= 21 * 60) { b = e + 120; why = 'late'; } }
+    if (!why && nx.work && plMin(nx.s) < 8 * 60) { const be = plMin(nx.s) + 1440 - 510; if (be < b) { b = be; why = 'early'; } }
+    bed.push({ m: b, why: why, ns: nx.work ? nx.s : '' });
+  }
+  for (let i = 0; i < N; i++) {
+    const k = W[i], d = days[i], ov = (S.days[k] || {}).tt;
+    let wake = null;
+    if (d.work && plMin(d.s) < 9 * 60) wake = Math.max(0, plMin(d.s) - 75);
+    else if (i > 0 && bed[i - 1].m >= 1440) wake = bed[i - 1].m - 1440 + 450; // couché après minuit : 7 h 30 de nuit
+    const p = { k: k, d: d, bed: bed[i].m, bedWhy: bed[i].why, bedNext: bed[i].ns, wake: wake, slot: null, when: '', rest: false, why: '', tt: 'off', din: bed[i].m - 105 };
+    if (ov === 'off') { p.rest = true; p.why = 'Repos choisi pour ce jour'; }
+    else if (ov && PL_TT[ov]) { p.slot = plMin(PL_TT[ov]); p.when = 'choice'; }
+    else if (!d.work) {
+      let sl = defTT;
+      if (sl > p.bed - 240) sl = Math.max(9 * 60, plQ(p.bed - 240, false)); // séance + dîner avant un coucher avancé
+      if (wake != null && sl < wake + 60) sl = plQ(wake + 60, true);
+      p.slot = sl; p.when = 'off';
+    }
+    else {
+      const s = plMin(d.s); let e = plMin(d.e); if (e <= s) e += 1440;
+      if (e - s > 600) { p.rest = true; p.why = 'Service de plus de 10 h : on récupère'; }
+      else {
+        const a = plQ(e + 120, true), bb = plQ(s - 300, false);
+        if (a <= 20 * 60 + 30 && a <= p.bed - 240) { p.slot = a; p.when = 'after'; }
+        else if (bb >= 9 * 60 && (wake == null || bb >= wake + 60)) { p.slot = bb; p.when = 'before'; }
+        else { p.rest = true; p.why = 'Pas de créneau entre ton service et ton sommeil'; }
+      }
+    }
+    P[k] = p;
+  }
+  // jours passés (et aujourd'hui si la séance est faite) : ce que tu as vraiment fait compte
+  const t = W[12];
+  W.forEach(k => {
+    if (k > t) return;
+    const tr = sessionsOn(k).some(x => isTrain(SESS[x.tpl]));
+    if (k === t && !tr) return;
+    const p = P[k]; p.fixed = true; p.trained = tr; p.rest = !tr; p.why = tr ? '' : 'Pas de séance ce jour-là';
+  });
+  // un jour de repos par bloc de service (si tu n'en as pas déjà pris un dans ce bloc)
+  for (let i = 0; i < N;) {
+    if (!days[i].work) { i++; continue; }
+    let j = i; while (j + 1 < N && days[j + 1].work) j++;
+    const len = j - i + 1, blk = W.slice(i, j + 1).map(k => P[k]);
+    if (len >= 3 && !blk.some(p => p.rest) && blk.some(p => !p.fixed)) {
+      let best = null, bs = 1e9;
+      blk.forEach((p, n) => { if (p.fixed) return; const sc = (p.when === 'before' ? 10 : p.when === 'after' ? 20 : 30) + Math.abs(n - (len - 2)); if (sc < bs) { bs = sc; best = p; } });
+      best.rest = true; best.why = (blk.indexOf(best) + 1) + (blk.indexOf(best) ? 'e' : 'er') + ' jour de service : on récupère';
+    }
+    i = j + 1;
+  }
+  // jamais plus de 6 jours d'entraînement d'affilée
+  let run = 0;
+  W.forEach(k => { const p = P[k]; if (p.rest) { run = 0; return; } if (p.fixed) { run++; return; } if (run >= 6) { p.rest = true; p.why = '6 jours d’entraînement d’affilée : on récupère'; run = 0; return; } run++; });
+  W.forEach(k => { const p = P[k]; if (p.rest) p.slot = null; p.tt = p.slot == null ? 'off' : p.slot < 720 ? 'matin' : p.slot < 1020 ? 'aprem' : 'soir'; });
+  PL.wk = P; PL.wkKey = key;
+  return P;
+}
+function wkFor(k) {
+  const P = wkPlan();
+  if (P[k]) return P[k];
+  const d = plDay(k), T = S.settings; // très loin : sans calcul de bloc
+  return { k: k, d: d, bed: 1410, bedWhy: '', bedNext: '', wake: null, slot: plMin(PL_TT[T.trainTime] || '18:30'), when: 'off', rest: false, why: '', tt: T.trainTime, din: 1305 };
+}
+function wkRest(k) { return wkFor(k).rest; }
+/* la séance du jour k (aujourd'hui ou plus tard) : rotation du coach, sautée les jours de repos */
+function plSession(k) {
+  const t = dkey();
+  if (k === t && S.active) return SESS[S.active.tpl] || SESS.repos;
+  if (wkRest(k)) return SESS.repos;
+  let n = 0;
+  for (let d = t; d < k; d = addDays(d, 1)) {
+    if (d === t) { if (!sessionsOn(t).some(x => isTrain(SESS[x.tpl])) && !wkRest(t)) n++; }
+    else if (!wkRest(d)) n++;
+  }
+  return SESS[ROT[(S.rot + n) % ROT.length]];
+}
+function plWhenTxt(p) { return p.when === 'after' ? 'après ton service' : p.when === 'before' ? 'avant ton service' : p.when === 'choice' ? 'heure choisie' : ''; }
+/* ligne d'infos sous la séance du jour */
+function plHeroLine(k) {
+  const p = wkFor(k), d = p.d;
+  if (p.rest) return plShiftTxt(d) + ' · ' + p.why;
+  return plShiftTxt(d) + ' · séance vers ' + plHM(p.slot);
+}
+function plBedTip(k) {
+  const p = wkFor(k);
+  return p.bedWhy === 'early' ? 'Coucher vers ' + plHM(p.bed) + ' : service à ' + p.bedNext + ' demain' : '';
+}
+/* le prochain jour d'entraînement après k */
+function plNextTrain(k) {
+  for (let i = 1; i <= 7; i++) { const d = addDays(k, i), s = planFor(d); if (isTrain(s)) return { k: d, s: s, p: wkFor(d) }; }
+  return null;
+}
+/* nombre de séances prévues cette semaine (lundi → dimanche) */
+function plWeekTarget(k) { const m = weekMon(k); let n = 0; for (let i = 0; i < 7; i++) if (!wkRest(addDays(m, i))) n++; return n; }
+
+/* ---------- repas du jour, autour du service ---------- */
+function plTimeline(k, tt) {
+  const p = wkFor(k), d = p.d, pf = planFor(k), it = [];
+  const din = plHM(p.din), bedTxt = plHM(p.bed);
+  let s = null, e = null;
+  if (d.work) { s = plMin(d.s); e = plMin(d.e); if (e <= s) e += 1440; it.push({ wk: 1, at: s, t: d.lab + ' ' + d.s + ' → ' + d.e, sub: d.gen ? 'Prévu par ton cycle 4/2' : 'D’après ton planning' }); }
+  const slot = p.slot != null && tt === p.tt ? p.slot : (tt !== 'off' ? plMin(PL_TT[tt]) : null);
+  if (tt !== 'off' && slot != null) it.push({ tr: 1, at: slot, t: 'vers ' + plHM(slot) + (p.when && tt === p.tt && plWhenTxt(p) ? ' · ' + plWhenTxt(p) : '') });
+  // déjeuner (fin du jeûne à midi)
+  let dej = 'Entre 12:00 et 15:00', dat = 720;
+  if (d.work && s < 720 && e <= 900) { dat = Math.max(720, plQ(e + 30, true)); dej = 'Après ton service, vers ' + plHM(dat); }
+  else if (d.work && s < 720) { dej = 'Pendant ta pause, entre 12:00 et 14:00'; dat = 750; }
+  else if (d.work && s - 90 >= 720) { dat = Math.max(720, Math.min(plQ(s - 150, false), 780)); dej = 'Vers ' + plHM(dat) + ', avant ton service'; }
+  else if (d.work) { dej = 'Pendant ta pause'; dat = s + 240; }
+  else if (tt === 'aprem') dej = 'Vers 12:00';
+  it.push({ m: 'dej', at: dat, t: dej });
+  // collation
+  let sn = 'Collation dans l’après-midi', sat = 990;
+  if (tt !== 'off' && slot != null) {
+    if (tt === 'soir') { sn = '30 min avant l’entraînement'; sat = slot - 30; }
+    else { sn = '1 h après l’entraînement'; sat = slot + (pf.est || 60) + 60; }
+    if (tt !== 'soir' && Math.abs(sat - dat) < 75) { sn = 'Collation dans l’après-midi'; sat = Math.max(dat + 150, 990); } // le déjeuner suit déjà la séance
+  }
+  if (d.work && sat > s && sat < e) { sn = 'Pendant ta pause'; sat = Math.round((s + e) / 2); }
+  it.push({ m: 'snack', at: sat, t: sn });
+  // dîner
+  if (p.bedWhy === 'late') it.push({ m: 'din', at: p.din, t: 'Après ton service, vers ' + din + ' · 2 h avant de dormir' });
+  else if (tt === 'soir' && slot != null) it.push({ m: 'din', at: slot + (pf.est || 60) + 60, t: '1 h après l’entraînement si possible' + (p.bedWhy === 'early' ? ' · avant ' + din : '') });
+  else it.push({ m: 'din', at: p.din, t: 'Vers ' + din + ' · 1 h 45 avant ton coucher' });
+  if (p.bedWhy) it.push({ bd: 1, at: p.bed, t: 'Coucher vers ' + bedTxt, sub: p.bedWhy === 'early' ? 'Service à ' + p.bedNext + ' demain : 7 h de sommeil' : 'Après ton service de fin de soirée' });
+  return it.sort((a, b) => a.at - b.at);
+}
+
+/* ---------- écrans ---------- */
+function plStatus() {
+  if (PL.raw === undefined) plSync();
+  const t = dkey();
+  let nx = null;
+  for (let i = 0; i < 21 && !nx; i++) { const k = addDays(t, i), d = plDay(k); if (d.work) nx = { k: k, d: d }; }
+  const when = nx ? (nx.k === t ? 'aujourd’hui' : nx.k === addDays(t, 1) ? 'demain' : JOURS_C[parseD(nx.k).getDay()].toLowerCase() + '. ' + parseD(nx.k).getDate()) + ' à ' + nx.d.s : '';
+  return { linked: !!PL.data, t2: (PL.data ? 'Relié' : 'Cycle 4/2 automatique') + (nx ? ' · prochain service ' + when : ' · aucun service dans les 3 semaines') };
+}
+function plSettingsHTML() {
+  const st = plStatus();
+  let h = '<div class="list ic">';
+  if (NATIVE && !NAT_PL) h += '<a class="row tap" href="' + SANTE_APK + '"><span class="tile" style="--c:#A0618D">' + ic('down') + '</span><div class="rt"><div class="t1">Mon planning dans l’appli</div><div class="t2">Mets à jour l’appli Android pour l’ouvrir ici</div></div>' + ic('chev', 'chev') + '</a>';
+  else h += row('cal', '#A0618D', 'Mon planning', st.t2, 'planOpen');
+  h += row('list', '#0A84FF', 'Mes 2 prochaines semaines', 'Services, séances et heures conseillées', 'weekPlan');
+  if (NATIVE) h += row('swap', '#5E5CE6', 'Transférer mon planning de Chrome', 'Une seule fois, en 3 gestes', 'planHelp');
+  h += '</div><div class="foot">' + (st.linked ? 'Chaque changement dans ton planning (échange, congé, renfort, horaires) met tes séances, tes repas et tes rappels à jour tout seuls.' : 'En attendant ton planning, My Coach suit ton cycle 4/2 (mêmes horaires que dans l’appli Planning). Ouvre-le une fois ici pour le relier.') + '</div>';
+  return h;
+}
+function plOpen() {
+  if (NAT_PL) { try { MCNative.openPlanning(); return; } catch (e) { /* ancienne appli */ } }
+  if (NATIVE) { planHelp(); return; }
+  window.open(new URL('../planning/', location.href).href, 'planning');
+}
+function planHelp() {
+  const steps = [
+    ['Dans Chrome', 'Ouvre ton Planning habituel → Réglages → Exporter. Il affiche «' + NB + 'Copié' + NB + '!' + NB + '».'],
+    ['Ici, dans My Coach', NAT_PL ? 'Réglages → Mon planning → Réglages → Importer.' : 'Mets d’abord à jour l’appli Android (bouton ci-dessous), puis Réglages → Mon planning → Réglages → Importer.'],
+    ['Colle et valide', 'Appui long dans la case → Coller, puis Importer. Tes séances se recalculent aussitôt.']
+  ];
+  openSheet({ id: 'plhelp', cls: 'float', html: shHead('Depuis Chrome') + '<div class="sh-body"><div class="list ic">' +
+    steps.map((x, i) => '<div class="row"><span class="tile" style="--c:#A0618D;font-size:17px;font-weight:700">' + (i + 1) + '</span><div class="rt"><div class="t1">' + x[0] + '</div><div class="t2">' + x[1] + '</div></div></div>').join('') + '</div>' +
+    (NATIVE && !NAT_PL ? '<div style="padding:4px 16px 0"><a class="btn btn-p btn-b" href="' + SANTE_APK + '">Mettre à jour l’appli Android</a></div>' : '') +
+    '<div class="foot">Ensuite, ouvre ton planning avec l’icône Planning installée avec My Coach (ou depuis Réglages). Ne modifie plus la version de Chrome : My Coach ne la voit pas.</div></div>' });
+}
+function weekPlanHTML() {
+  const t = dkey();
+  let h = shHead('Mes 2 semaines') + '<div class="sh-body"><div class="list ic">';
+  for (let i = 0; i < 14; i++) {
+    const k = addDays(t, i), p = wkFor(k), d = p.d, done = sessionsOn(k).filter(x => isTrain(SESS[x.tpl])).pop();
+    const s = done ? SESS[done.tpl] : planFor(k), dn = (i === 0 ? 'Aujourd’hui' : i === 1 ? 'Demain' : cap(JOURS[parseD(k).getDay()]) + ' ' + parseD(k).getDate());
+    let t2 = plShiftTxt(d);
+    if (done) t2 += ' · faite ✓';
+    else if (isTrain(s)) t2 += ' · vers ' + plHM(p.slot != null ? p.slot : plMin(PL_TT[S.settings.trainTime] || '18:30'));
+    else t2 += ' · ' + p.why.replace(/ : on récupère$/, '').toLowerCase();
+    if (p.bedWhy === 'early') t2 += ' · coucher ' + plHM(p.bed);
+    const icn = isTrain(s) ? (s.kind === 'cardio' ? 'heart' : 'dumbbell') : 'moon';
+    h += row(icn, isTrain(s) ? s.color : '#8E8E93', dn + ' · ' + (isTrain(s) ? s.name : 'Repos'), t2, isTrain(s) ? 'sessionDetail' : 'planDay', isTrain(s) ? ' data-id="' + s.id + '"' : ' data-k="' + k + '"');
+  }
+  h += '</div><div class="foot">Calculé depuis ' + (PL.data ? 'ton appli Planning' : 'ton cycle 4/2') + ', mis à jour à chaque changement. Après un service qui finit tôt : séance 2 h après. Avant un service qui commence tard : séance le matin. Un jour de repos par bloc de service. Pour changer un jour, choisis ton moment dans Nutrition → Repas du jour.</div></div>';
+  return h;
+}
+function plDayHTML(k) {
+  const p = wkFor(k), d = p.d, s = planFor(k);
+  let h = shHead(cap(JOURS[parseD(k).getDay()]) + ' ' + fmtDay(k)) + '<div class="sh-body"><div class="list ic">';
+  h += row('cal', '#A0618D', plShiftTxt(d), d.gen ? 'Prévu par ton cycle 4/2' : 'D’après ton planning');
+  if (isTrain(s)) h += row(s.kind === 'cardio' ? 'heart' : 'dumbbell', s.color, s.name, 'Vers ' + plHM(p.slot) + (plWhenTxt(p) ? ' · ' + plWhenTxt(p) : '') + ' · ≈ ' + s.est + NB + 'min', 'sessionDetail', ' data-id="' + s.id + '"');
+  else h += row('moon', '#8E8E93', 'Repos', p.why || 'Récupération');
+  h += row('fork', '#FF9F0A', 'Dîner', (p.bedWhy === 'late' ? 'Après ton service, vers ' : 'Vers ') + plHM(p.din));
+  h += row('bed', '#7D7AFF', 'Coucher', 'Vers ' + plHM(p.bed) + (p.bedWhy === 'early' ? ' · service à ' + p.bedNext + ' le lendemain' : ''));
+  return h + '</div></div>';
+}
+function plDaySheet(k) { openSheet({ id: 'plday', cls: 'float', render: () => plDayHTML(k) }); }
+
+/* ---------- rappels selon le planning ---------- */
+function plTrainBody(p, s) { return (p.when === 'after' ? 'Après ton service. ' : p.when === 'before' ? 'Avant ton service de ' + p.d.s + '. ' : '') + plural(s.ex.length, 'exercice') + ' · environ ' + s.est + ' min. L’échauffement d’abord !'; }
+function plReminders() {
+  const T = S.settings, R = [], now = Date.now(), t = dkey(), wDef = plMin(T.remindWeigh || '07:30') || 450;
+  const weighB = 'À jeun, après être passé aux toilettes. Note-la dans My Coach.';
+  if (NAT_PL) {
+    let id = 0;
+    for (let i = 0; i < 14 && id < 60; i++) {
+      const k = addDays(t, i), p = wkFor(k), s = planFor(k);
+      if (!p.rest && p.slot != null && isTrain(s) && !sessionsOn(k).some(x => isTrain(SESS[x.tpl]))) {
+        const a = plAt(k, p.slot - 30);
+        if (a > now + 60000) R.push({ id: id++, at: a, t: 'Séance vers ' + plHM(p.slot) + ' : ' + s.name, b: plTrainBody(p, s) });
+      }
+      const aw = plAt(k, p.wake != null ? p.wake + 10 : wDef);
+      if (aw > now + 60000) R.push({ id: id++, at: aw, t: 'Pesée du matin', b: weighB });
+      if (T.remindBed !== false && p.bedWhy === 'early') {
+        const ab = plAt(k, p.bed - 30);
+        if (ab > now + 60000) R.push({ id: id++, at: ab, t: 'Coucher conseillé à ' + plHM(p.bed), b: 'Demain, service à ' + p.bedNext + ' : vise 7 h de sommeil.' });
+      }
+    }
+  } else {
+    // ancienne appli Android : un rappel par jour de la semaine pour les 7 prochains jours
+    for (let i = 0; i < 7; i++) {
+      const k = addDays(t, i), p = wkFor(k), s = planFor(k);
+      if (!p.rest && p.slot != null && isTrain(s)) { const m = Math.max(0, p.slot - 30); R.push({ id: i, h: Math.floor(m / 60), m: m % 60, days: [parseD(k).getDay()], t: 'Séance vers ' + plHM(p.slot) + ' : ' + s.name, b: plTrainBody(p, s) }); }
+    }
+    R.push({ id: 9, h: Math.floor(wDef / 60), m: wDef % 60, days: [0, 1, 2, 3, 4, 5, 6], t: 'Pesée du matin', b: weighB });
+  }
+  return R;
+}
+/* séances des 14 prochains jours pour le calendrier du téléphone (navigateur) */
+function plIcsEvents() {
+  const t = dkey(), ev = [];
+  for (let i = 0; i < 14; i++) {
+    const k = addDays(t, i), p = wkFor(k), s = planFor(k);
+    if (!p.rest && p.slot != null && isTrain(s)) ev.push({ id: 'pl-' + k, s: 'My Coach · ' + s.name, d0: k, t: plHM(p.slot), dur: 'PT' + Math.max(30, s.est || 60) + 'M', a: '-PT30M', desc: plTrainBody(p, s) });
+  }
+  return ev;
+}
+
+/* ---------- mise à jour automatique ---------- */
+/* ce qui vient du planning sur 14 jours (service ou type de journée) */
+function plSigNow() {
+  const t = dkey(), o = {};
+  for (let i = 0; i < 14; i++) { const k = addDays(t, i), d = plDay(k); o[k] = d.work ? d.s + '-' + d.e : d.ty; }
+  return o;
+}
+function plChangeMsg(ks) {
+  const k = ks[0], p = wkFor(k), d = p.d;
+  let m = 'Planning mis à jour · ' + plDayName(k) + ' : ' + (d.work ? d.lab.toLowerCase() + ' ' + d.s + ' → ' + d.e : (d.lab === 'OFF' ? 'OFF' : d.lab.toLowerCase()));
+  m += p.rest ? ', repos' : ', séance vers ' + plHM(p.slot);
+  if (ks.length > 1) m += ' (et ' + (ks.length - 1) + (ks.length > 2 ? ' autres jours)' : ' autre jour)');
+  return m;
+}
+/* après un changement du planning : compare, prévient, recalcule écrans et rappels */
+function plApply(quiet) {
+  if (S.settings.mode !== 'planning') { softRerender('settings'); return; }
+  const sig = plSigNow(), old = S.plan && S.plan.sig;
+  const ch = old ? Object.keys(sig).filter(k => k in old && old[k] !== sig[k]).sort() : [];
+  S.plan = { sig: sig, at: Date.now() }; save();
+  if (ch.length) toast(plChangeMsg(ch), 'cal', '#B4709F', 6000);
+  if (!quiet || ch.length) { refresh(); ['settings', 'weekplan', 'plday'].forEach(softRerender); }
+  natReminders();
+}
+/* copie du planning dans tes données My Coach : il part avec la sauvegarde cloud */
+function plMirror() {
+  const raw = PL.raw; if (!raw || !PL.data) return;
+  if (S.planning && S.planning.raw === raw) return;
+  S.planning = { raw: raw, at: Date.now() }; save();
+}
+/* téléphone neuf ou appli réinstallée : le planning revient de la sauvegarde */
+function plRestore() {
+  if (plRaw()) return false;
+  const m = S.planning; if (!m || typeof m.raw !== 'string' || !plParse(m.raw)) return false;
+  try { localStorage.setItem(PL_KEY, m.raw); return true; } catch (e) { return false; }
+}
+function plCheck() { if (plSync()) { plMirror(); plApply(false); } }
+function plAfterState() { plRestore(); PL.raw = undefined; plSync(); plMirror(); if (S.settings.mode === 'planning') plApply(true); }
+function plBoot() {
+  plSync();
+  if (plRestore()) plSync();
+  plMirror();
+  if (S.settings.mode === 'planning') setTimeout(() => plApply(true), 900);
+}
+/* l'appli Planning enregistre → My Coach se recalcule (autre onglet, autre écran de l'appli, retour dans l'appli) */
+window.addEventListener('storage', e => { if (e.key === PL_KEY || e.key === null) plCheck(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') plCheck(); });
+setInterval(() => { if (document.visibilityState === 'visible') plCheck(); }, 20000);
+window.mcPlanning = function () { plCheck(); };
+/* passage en mode planning : la rotation reprend après ta dernière séance */
+function rotFromLast() {
+  const last = S.sessions.filter(x => ROT.indexOf(x.tpl) >= 0).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a.start || 0) - (b.start || 0))).pop();
+  if (last) S.rot = (ROT.indexOf(last.tpl) + 1) % ROT.length;
+}
+
+/* =========================================================
    NAVIGATION, ÉVÉNEMENTS, DÉMARRAGE
    ========================================================= */
 let TAB = 'today';
@@ -4565,12 +5003,12 @@ const ACT = {
   seg: t => {
     const n = t.dataset.name, v = t.dataset.v;
     haptic();
-    if (n === 'tt') { day(dkey(), true).tt = v; save(); refresh(); }
+    if (n === 'tt') { day(dkey(), true).tt = v; save(); refresh(); if (S.settings.mode === 'planning') natReminders(); }
     else if (n === 'prog') { PROG_SEG = v; refresh(); }
     else if (n === 'range') { RANGE = v; refresh(); }
     else if (n === 'sex') { S.profile.sex = v; save(); refresh(); rerenderSheet('settings'); }
-    else if (n === 'mode') { S.settings.mode = v; save(); refresh(); rerenderSheet('settings'); natReminders(); }
-    else if (n === 'train') { S.settings.trainTime = v; save(); refresh(); rerenderSheet('settings'); }
+    else if (n === 'mode') { if (v !== 'fixed' && S.settings.mode === 'fixed') rotFromLast(); S.settings.mode = v; if (v === 'planning') { plSync(); S.plan = { sig: plSigNow(), at: Date.now() }; } save(); refresh(); rerenderSheet('settings'); natReminders(); }
+    else if (n === 'train') { S.settings.trainTime = v; save(); refresh(); rerenderSheet('settings'); natReminders(); }
     else if (n === 'theme') { S.settings.theme = v; save(); applyTheme(); refresh(); rerenderSheet('settings'); }
     else if (n === 'shop') { SHOP_DAYS = +v; rerenderSheet('shop'); }
     else if (n === 'pcstep') { PC.step = +v; rerenderSheet('palcalc'); }
@@ -4587,8 +5025,12 @@ const ACT = {
   coachLater: () => { coachState().snooze = dkey(); save(); refresh(); },
   coachReset: () => coachReset(),
   science: () => openSheet({ id: 'science', cls: 'full', render: scienceHTML }),
+  planOpen: () => plOpen(),
+  planHelp: () => planHelp(),
+  weekPlan: () => openSheet({ id: 'weekplan', cls: 'full', render: weekPlanHTML }),
+  planDay: t => plDaySheet(t.dataset.k),
   ringsInfo: () => ringsInfo(),
-  dayPeek: t => { const k = t.dataset.k; const done = sessionsOn(k); if (k > dkey()) { const p = planFor(k); if (isTrain(p)) sessionDetail(p.id); else daySheetRest(); } else daySheet(k); },
+  dayPeek: t => { const k = t.dataset.k; if (k > dkey()) { if (S.settings.mode === 'planning') { plDaySheet(k); return; } const p = planFor(k); if (isTrain(p)) sessionDetail(p.id); else daySheetRest(); } else daySheet(k); },
   habit: t => {
     const id = t.dataset.id, k = dkey(), r = day(k, true);
     POP = 'hab:' + id;
@@ -4677,7 +5119,7 @@ const ACT = {
   toggleSet: t => {
     const k = t.dataset.k; S.settings[k] = !S.settings[k]; save(); haptic(); rerenderSheet('settings'); refresh();
     if (k === 'sound' && S.settings.sound) sound('tick');
-    if (k === 'notifs') natReminders();
+    if (k === 'notifs' || k === 'remindBed') natReminders();
     if (k === 'voice' && natVoiceOn()) { natSay('C’est ton coach. Je suis là.'); }
     else if (k === 'voice') { if (S.settings.voice) { vxUnlock(); vxLoad().then(ok => { if (ok) vxSay(['voice_test'], 'Voix du coach'); rerenderSheet('settings'); }); } else vxStop(); }
   },
@@ -4802,6 +5244,7 @@ document.addEventListener('visibilitychange', () => {
 
 /* ---------- démarrage ---------- */
 function init() {
+  plBoot();
   applyTheme();
   buildTabbar();
   $('#v-today').classList.add('on');

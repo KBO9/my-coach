@@ -1,5 +1,5 @@
 /* My Coach — service worker : l'app (et la voix du coach) fonctionnent même sans réseau à la salle */
-const VERSION = 'my-coach-v3.3.0';
+const VERSION = 'my-coach-v3.4.0';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './voix-coach.json', './voix-coach.bin'];
 
 self.addEventListener('install', e => {
@@ -10,7 +10,7 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()
-    .then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k))))
+    .then(keys => Promise.all(keys.filter(k => k !== VERSION && k.indexOf('my-coach-') === 0).map(k => caches.delete(k)))) // Planning (même site) garde son cache
     .then(() => self.clients.claim()));
 });
 
