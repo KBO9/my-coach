@@ -697,10 +697,10 @@ a.row{color:inherit}
 .sante .sa-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .sante .k{font-size:12px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.03em}
 .sante .big{font-size:27px;margin:3px 0 2px}
-.stg{display:flex;height:10px;border-radius:5px;overflow:hidden;gap:2px;margin-top:14px;background:var(--fill2)}
-.stg i{display:block;min-width:3px}
-.stg-l{display:flex;flex-wrap:wrap;gap:5px 14px;margin-top:9px;font-size:12px;color:var(--t2)}
-.stg-l b{display:inline-block;width:8px;height:8px;border-radius:4px;margin-right:5px}
+.sbar{display:flex;height:10px;border-radius:5px;overflow:hidden;gap:2px;margin-top:14px;background:var(--fill2)}
+.sbar i{display:block;min-width:3px}
+.sbar-l{display:flex;flex-wrap:wrap;gap:5px 14px;margin-top:9px;font-size:12px;color:var(--t2)}
+.sbar-l b{display:inline-block;width:8px;height:8px;border-radius:4px;margin-right:5px}
 .slb{position:relative;display:flex;gap:5px;height:150px;padding-top:6px}
 .slb .c{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
 .slb .bw{flex:1;width:100%;position:relative}
@@ -1461,9 +1461,12 @@ function fastState() {
     const st = new Date(last.t);
     const target = new Date(st); target.setHours(12, 0, 0, 0);
     if (st.getHours() >= 12) target.setDate(target.getDate() + 1);
+    // fenêtre du déjeuner refermée (15:00) sans repas noté : on ne sait plus où tu en es
+    if (now > +target + 3 * 3600e3) return { mode: 'none' };
     const total = (target - st) / 1000, el = (now - last.t) / 1000;
     return { mode: 'fast', start: last.t, target: +target, total: total, elapsed: el, pct: clamp(el / total, 0, 1), done: el >= total };
   }
+  if (now - last.t > 16 * 3600e3) return { mode: 'none' }; // repas noté hier, rien depuis
   return { mode: 'eat', since: last.t, last: last.type };
 }
 function fastStage(fs) {
@@ -3864,12 +3867,12 @@ function sleepSheetHTML() {
   h += '<div class="card"><div class="ch">' + ic('chart') + 'Durée par nuit<span class="r">objectif 7 h</span></div><div class="slb">' + chart.map(d => { const n = m[d]; return '<div class="c"><div class="bw"><i style="height:' + (clamp(n.min / 600, 0.03, 1) * 100).toFixed(1) + '%;background:' + (n.min >= 420 ? '#5E5CE6' : 'rgba(94,92,230,.45)') + '"></i></div><span>' + JOURS_C[parseD(d).getDay()].charAt(0) + '</span></div>'; }).join('') + '<b class="goal"></b></div></div>';
   if (last.st) h += '<div class="card"><div class="ch">' + ic('moon') + 'Phases de la dernière nuit</div>' + stageBar(last) + '</div>';
   h += '<div class="list">' + days.map(d => { const n = m[d]; return '<div class="row"><div class="rt"><div class="t1" style="font-size:16px">' + cap(relDay(d)) + '</div><div class="t2">' + hhmm(n.s) + ' → ' + hhmm(n.e) + (n.st ? ' · profond ' + hmin(n.deep) : '') + '</div></div><div class="rv" style="font-size:16px;font-weight:600;color:' + (n.min >= 420 ? 'var(--green)' : 'var(--t1)') + '">' + hmin(n.min) + '</div></div>'; }).join('') + '</div>';
-  h += '<div class="foot">Données de Samsung Health reçues ' + agoTxt(HEALTH.at) + ' grâce à l’appli My Coach Santé. Une nuit compte pour le jour du réveil ; les siestes de moins d’1 h 30 ne sont pas comptées.</div>';
+  h += '<div class="foot">Données de Samsung Health reçues ' + agoTxt(HEALTH.at) + ' grâce à l’appli Android My Coach. Une nuit compte pour le jour du réveil ; les siestes de moins d’1 h 30 ne sont pas comptées.</div>';
   return h + '</div>';
 }
 function stageBar(n) {
   const seg = [['deep', 'Profond', '#5E5CE6'], ['rem', 'Paradoxal', '#64D2FF'], ['light', 'Léger', '#0A84FF'], ['awake', 'Éveillé', '#FF9F0A']];
-  return '<div class="stg">' + seg.map(s => '<i style="flex:' + (n[s[0]] || 0) + ';background:' + s[2] + '"></i>').join('') + '</div><div class="stg-l">' + seg.map(s => '<span><b style="background:' + s[2] + '"></b>' + s[1] + ' ' + hmin(n[s[0]] || 0) + '</span>').join('') + '</div>';
+  return '<div class="sbar">' + seg.map(s => '<i style="flex:' + (n[s[0]] || 0) + ';background:' + s[2] + '"></i>').join('') + '</div><div class="sbar-l">' + seg.map(s => '<span><b style="background:' + s[2] + '"></b>' + s[1] + ' ' + hmin(n[s[0]] || 0) + '</span>').join('') + '</div>';
 }
 
 /* =========================================================
